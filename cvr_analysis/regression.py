@@ -20,9 +20,9 @@ class RegressCVR(ProcessNode):
     """
     Performs linear regression between regressir data och bold data.
     """
-    outputs = ("dof", "design_matrix", "betas", "r_squared",  "r_squared_adjusted", "predictions")
+    outputs = ("dof", "nr_predictors", "design_matrix", "betas", "r_squared",  "r_squared_adjusted", "predictions", "nr_removed_colinear")
 
-    def _run(self, bold_series : np.ndarray, regressor_series : np.ndarray = None, confounds_df : pd.DataFrame = None) -> tuple:
+    def _run(self, bold_series : np.ndarray, regressor_series : np.ndarray = None, confounds_df : pd.DataFrame = None, colinear : str = None, colinear_thr : float = 0) -> tuple:
         # check confounds_df
         if confounds_df is None:
             confounds_df = pd.DataFrame([], index = range(len(bold_series)))
@@ -39,6 +39,15 @@ class RegressCVR(ProcessNode):
         nan_rows = design_matrix.isna().any(axis=1)
         non_nan_dm = design_matrix[~nan_rows]
         non_nan_bs = bold_series[~nan_rows]
+        # handle collinearity
+        if colinear is not None:
+            colinear_mask = self._get_colinear_confounds(non_nan_dm, method=colinear, threshold=colinear_thr)
+            design_matrix = design_matrix.loc[:, ~colinear_mask]
+            non_nan_dm = non_nan_dm.loc[:, ~colinear_mask]
+            nr_colinear = np.sum(colinear_mask)
+        else:
+            nr_colinear = 0
+        # get dimensions
         n, p = non_nan_dm.shape
         # regress
         reg = lm.LinearRegression(fit_intercept=False).fit(non_nan_dm, non_nan_bs)
@@ -51,7 +60,69 @@ class RegressCVR(ProcessNode):
         residual_sum_of_squares_constant_model = residual_constant_model.T @ residual_constant_model
         r_squared = 1 - residual_sum_of_squares / residual_sum_of_squares_constant_model if residual_sum_of_squares_constant_model > 0 else np.nan
         r_squared_adjusted = 1 - (1 - r_squared) * (n - 1) / (n - p) if (n - p) > 0 else np.nan
-        return n, design_matrix, betas, r_squared, r_squared_adjusted, design_matrix @ betas
+        return n, p, design_matrix, betas, r_squared, r_squared_adjusted, design_matrix @ betas, nr_colinear
+    
+    def _get_colinear_confounds(self, design_matrix : pd.DataFrame, method : str = "corr", threshold : float = 0):
+        """
+        removes colineary using vector inflation factor (method = 'vif') or correlations with regressor (method = 'corr')
+        """
+        if method == "vif":
+            colinear_cofounds = []
+            confounds = design_matrix.columns.to_list()
+            # constant and regressor is not considered confounds
+            if "constant" in confounds:
+                confounds.remove("constant")
+            if "regressor" in confounds:
+                confounds.remove("regressor")
+            # loop through while maximimum vif is above threshold
+            while True:
+                # chreate list of vifs
+                vifs = [0]*len(confounds)
+                # calculate vif
+                for i, c in enumerate(confounds):
+                    # remove confound idx
+                    X,y  = design_matrix[confounds].drop(columns=c), design_matrix[c]
+                    vifs[i] = 1 / (1 - lm.LinearRegression().fit(X,y).score(X,y))
+                # remove max if above threshold
+                if len(vifs) > 0 and np.max(vifs) > threshold:
+                    conf_max = confounds[np.argmax(vifs)]
+                    confounds.remove(conf_max)
+                    colinear_cofounds.append(conf_max)
+                    continue
+                else:
+                    # if no vif greater than threshold
+                    break
+            # return mask for columns
+            return np.array([True if c in colinear_cofounds else False for c in design_matrix.columns])
+        elif method == 'corr':
+            confounds = design_matrix.columns.to_list()
+            # constant and regressor is not considered confounds
+            if "constant" in confounds:
+                confounds.remove("constant")
+            if "regressor" in confounds:
+                confounds.remove("regressor")
+            else:
+                return [True]*design_matrix.shape[1]
+            
+            confounds_mat = design_matrix[confounds].values.T
+            regressor_vec = design_matrix["regressor"].values[None,:] 
+            
+            # Rowwise mean of input arrays & subtract from input arrays themeselves
+            A_mA = confounds_mat - confounds_mat.mean(1)[:, None]
+            B_mB = regressor_vec - regressor_vec.mean(1)[:, None]
+
+            # Sum of squares across rows
+            ssA = (A_mA**2).sum(1)
+            ssB = (B_mB**2).sum(1)
+
+            # Finally get corr coeff
+            r_squared = (np.dot(A_mA, B_mB.T) / np.sqrt(np.dot(ssA[:, None],ssB[None, :])))**2
+            confounds_mask = r_squared > threshold
+            colinear_cofounds = [c for i,c in enumerate(confounds) if confounds_mask[i]]
+            # return mask for columns
+            return np.array([True if c in colinear_cofounds else False for c in design_matrix.columns])
+        else:
+            raise ValueError(f"Invalid method for removal of colinearity given: {method}.")
     
 class AlignRegressor(ProcessNode):
     outputs = ("aligned_regressor_series",)
