@@ -195,6 +195,10 @@ class TemporalFilter(ProcessNode):
     outputs = ("filtered_series",)
 
     def _run(self, series : np.ndarray, sample_time : float, filter_freq : float, filter_order : int = 6) -> tuple:
+        # check if filter freq is none, return directly
+        if filter_freq is None:
+            return series
+        # otherwise filter data
         if isinstance(filter_freq, Iterable):
             if len(filter_freq) != 2:
                 raise ValueError("'filter_freq' can either be a single value for lowpass filter of list of two values for bandpass filter.")
@@ -215,6 +219,10 @@ class TemporalFilterAll(ProcessNode):
     outputs = ("filtered_bold_data", "filtered_confounds_df", "filtered_regressor_series")
 
     def _run(self, sample_time : float, filter_freq : float, bold_data : np.ndarray, confounds_df : pd.DataFrame = None, regressor_series : np.ndarray = None, filter_order : int = 6) -> tuple:
+        # check if filter freq is none, return directly
+        if filter_freq is None:
+            return bold_data, confounds_df, regressor_series
+        # otherwise filter data
         if isinstance(filter_freq, Iterable):
             if len(filter_freq) != 2:
                 raise ValueError("'filter_freq' can either be a single value for lowpass filter of list of two values for bandpass filter.")

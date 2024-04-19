@@ -116,8 +116,8 @@ class RegressCVR(ProcessNode):
             ssB = (B_mB**2).sum(1)
 
             # Finally get corr coeff
-            r_squared = (np.dot(A_mA, B_mB.T) / np.sqrt(np.dot(ssA[:, None],ssB[None, :])))**2
-            confounds_mask = r_squared > threshold
+            corr_abs = np.abs(np.dot(A_mA, B_mB.T) / np.sqrt(np.dot(ssA[:, None],ssB[None, :])))
+            confounds_mask = corr_abs > threshold
             colinear_cofounds = [c for i,c in enumerate(confounds) if confounds_mask[i]]
             # return mask for columns
             return np.array([True if c in colinear_cofounds else False for c in design_matrix.columns])
