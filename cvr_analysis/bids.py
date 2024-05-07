@@ -87,3 +87,30 @@ class ImageLoader(ProcessNode):
             return files[0]
         
     
+class DsegLoader(ProcessNode):
+    outputs = ("labels_img",)
+    
+    def _run(self, bids_layout : BIDSLayout, subject : str, session : str = None, task : str = None, run : str = None, space : str = None, desc : str = None) -> dict:
+        # load labels img
+        labels_img = image.load_img(
+                        self._checkBIDSQuery("BOLD", 
+                            bids_layout.get(
+                                return_type="file", 
+                                    subject=subject, 
+                                        session=session, 
+                                            task=task, 
+                                                run=run, 
+                                                    space=space, 
+                                                        desc=desc,
+                                                            suffix="dseg", 
+                                                                extension=".nii.gz")))
+        return labels_img,
+
+    def _checkBIDSQuery(self, file : str, files : list[str]) -> str:
+        if len(files) == 0:
+            raise ValueError(f"Could not find {file} file.")
+        elif len(files) > 1:
+            raise ValueError(f"Found multiple {file} files.")
+        else:
+            return files[0]
+        
