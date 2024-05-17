@@ -48,13 +48,14 @@ class IMGShow:
         self.axial_ax.axvline(self.pos[0], color = "black", alpha = 0.5)
         self.axial_ax.axhline(self.pos[1], color = "black", alpha = 0.5)
         # plot ax
-        for data in self.plot_data:
+        for data, label in self.plot_data:
             if data.ndim == 1:
-                self.plot_ax.plot(data)
+                self.plot_ax.plot(data, label = label)
             elif data.ndim == 4:
-                self.plot_ax.plot(data[self.pos[0], self.pos[1], self.pos[2]])
+                self.plot_ax.plot(data[self.pos[0], self.pos[1], self.pos[2]], label = label)
             else:
                 raise ValueError("Incorrect dimensions")
+        self.plot_ax.legend(loc = "lower right")
         # self.plot_ax.set_aspect('equal')
 
         self.setAxis()
@@ -112,17 +113,29 @@ def showCVRAnalysisResult(analysis_file : str):
     # mask cvr file
     cvr_mask = np.abs(cvr_img.get_fdata()) < 1e-10
     cvr_img_masked = np.ma.masked_where(cvr_mask, cvr_img.get_fdata())
+    # data
+    data = []
     # get bold data
-    bold_img = image.load_img(os.path.join(folder, preamble + "desc-filteredBold_bold.nii.gz"))
+    try:
+        bold_img = image.load_img(os.path.join(folder, preamble + "desc-filteredBold_bold.nii.gz"))
+        data.append((stand(bold_img.get_fdata()), "bold"))
+    except:
+        print("No bold img found")
     # get aligned regressor data
-    regressor_img = image.load_img(os.path.join(folder, preamble + "desc-alignedRegressor_map.nii.gz"))
+    try:
+        regressor_img = image.load_img(os.path.join(folder, preamble + "desc-alignedRegressor_map.nii.gz"))
+        data.append((stand(regressor_img.get_fdata()), "regressor"))
+    except:
+        print("No regressor img found")
     # get predictions
-    predictions_img = image.load_img(os.path.join(folder, preamble + "desc-boldPredictions_map.nii.gz"))
+    try:
+        predictions_img = image.load_img(os.path.join(folder, preamble + "desc-boldPredictions_map.nii.gz"))
+        data.append((stand(predictions_img.get_fdata()), "prediction"))
+    except:
+        print("No prediction img found")
 
     img_show = IMGShow(cvr_img_masked, settings, 
-                        stand(bold_img.get_fdata()), 
-                            stand(regressor_img.get_fdata()),
-                                stand(predictions_img.get_fdata()))
+                        *data)
     return img_show 
 
 if __name__ == "__main__":
