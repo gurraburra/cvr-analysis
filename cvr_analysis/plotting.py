@@ -55,7 +55,7 @@ class IMGShow:
                 self.plot_ax.plot(data[self.pos[0], self.pos[1], self.pos[2]], label = label)
             else:
                 raise ValueError("Incorrect dimensions")
-        self.plot_ax.legend(loc = "lower right")
+        self.plot_ax.legend(loc = "lower left")
         # self.plot_ax.set_aspect('equal')
 
         self.setAxis()
@@ -107,9 +107,9 @@ def showCVRAnalysisResult(analysis_file : str):
     settings = {"cmap" : "RdYlBu_r", "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower"}
     # folder preamble
     folder, analys_file = os.path.split(analysis_file)
-    preamble = analys_file.split("desc-analys_info")[0]
+    preamble = analys_file.split("_desc-analys_info")[0]
     # cvr file
-    cvr_img = image.load_img(os.path.join(folder, preamble + "desc-CVRAmplitude_map.nii.gz"))
+    cvr_img = image.load_img(os.path.join(folder, preamble + "_desc-CVRAmplitude_map.nii.gz"))
     # mask cvr file
     cvr_mask = np.abs(cvr_img.get_fdata()) < 1e-10
     cvr_img_masked = np.ma.masked_where(cvr_mask, cvr_img.get_fdata())
@@ -117,25 +117,28 @@ def showCVRAnalysisResult(analysis_file : str):
     data = []
     # get bold data
     try:
-        bold_img = image.load_img(os.path.join(folder, preamble + "desc-filteredBold_bold.nii.gz"))
+        bold_img = image.load_img(os.path.join(folder, preamble + "_desc-filteredBold_bold.nii.gz"))
         data.append((stand(bold_img.get_fdata()), "bold"))
     except:
         print("No bold img found")
     # get aligned regressor data
     try:
-        regressor_img = image.load_img(os.path.join(folder, preamble + "desc-alignedRegressor_map.nii.gz"))
+        regressor_img = image.load_img(os.path.join(folder, preamble + "_desc-alignedRegressor_map.nii.gz"))
         data.append((stand(regressor_img.get_fdata()), "regressor"))
     except:
         print("No regressor img found")
     # get predictions
     try:
-        predictions_img = image.load_img(os.path.join(folder, preamble + "desc-boldPredictions_map.nii.gz"))
+        predictions_img = image.load_img(os.path.join(folder, preamble + "_desc-boldPredictions_map.nii.gz"))
         data.append((stand(predictions_img.get_fdata()), "prediction"))
     except:
         print("No prediction img found")
 
     img_show = IMGShow(cvr_img_masked, settings, 
                         *data)
+    
+    img_show.fig.suptitle(preamble)
+
     return img_show 
 
 if __name__ == "__main__":
