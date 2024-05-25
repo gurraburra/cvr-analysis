@@ -92,7 +92,7 @@ class Correlate(ProcessNode):
     to the right, i.e leads series_a.
     """
     outputs = ("timeshift_maxcorr", "maxcorr", "timeshifts", "correlations")
-    def _run(self, series_a : np.ndarray, series_b : np.ndarray, lower_limit : int = None, upper_limit : int = None, bipolar : bool = True) -> tuple:
+    def _run(self, series_a : np.ndarray, series_b : np.ndarray, time_step : float, lower_limit : int = None, upper_limit : int = None, bipolar : bool = True) -> tuple:
         # norm factor
         # min_len = min(len(series_a), len(series_b))
         # diff = abs(len(series_a) - len(series_b))
@@ -100,21 +100,27 @@ class Correlate(ProcessNode):
         norm_factor = min(len(series_a), len(series_b))
         # correlate
         correlations = sc_signal.correlate((series_a - series_a.mean()) / series_a.std(), (series_b - series_b.mean()) / series_b.std()) / norm_factor
-        timeshifts = np.arange(-len(series_b)+1, len(series_a), 1)
+        timeshifts = np.arange(-len(series_b)+1, len(series_a), 1) * time_step
         # find bound
         mask = np.full_like(timeshifts, True, dtype = bool)
         if lower_limit is not None:
             mask[timeshifts < lower_limit] = False
         if upper_limit is not None:
             mask[timeshifts > upper_limit] = False
-        # bound correlations and timeshifts
-        correlations = correlations[mask]
-        timeshifts = timeshifts[mask]
         # find max
-        if bipolar:
-            index = np.argmax(np.abs(correlations))
+        if any(mask):
+            # bound correlations and timeshifts
+            correlations = correlations[mask]
+            timeshifts = timeshifts[mask]
+            if bipolar:
+                index = np.argmax(np.abs(correlations))
+            else:
+                index = np.argmax(correlations)
+        elif lower_limit != None and lower_limit == upper_limit:
+            # pick value closet to the limits
+            index = np.argmin(np.abs(timeshifts - lower_limit))
         else:
-            index = np.argmax(correlations)
+            raise ValueError("Incorrect limits specified.")
 
         return timeshifts[index], correlations[index], timeshifts, correlations
     

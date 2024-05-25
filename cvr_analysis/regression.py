@@ -127,12 +127,14 @@ class RegressCVR(ProcessNode):
 class AlignRegressor(ProcessNode):
     outputs = ("aligned_regressor_series",)
 
-    def _run(self, regressor_series : np.ndarray, timeshift_regressor : float, length : int) -> tuple:
+    def _run(self, regressor_series : np.ndarray, timeshift_regressor : float, time_step : float, length : int) -> tuple:
+        # convert to index
+        timeshift_index = int(round(timeshift_regressor / time_step, 0))
         # handled timeshift
-        if timeshift_regressor <= 0:
-            regressor_series = regressor_series[-timeshift_regressor:]
+        if timeshift_index <= 0:
+            regressor_series = regressor_series[-timeshift_index:]
         else:
-            regressor_series = np.concatenate((np.full(timeshift_regressor, np.nan), regressor_series))
+            regressor_series = np.concatenate((np.full(timeshift_index, np.nan), regressor_series))
         # make sure equal length
         diff = length - len(regressor_series)
         if diff >= 0:
