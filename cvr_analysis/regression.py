@@ -20,7 +20,7 @@ class RegressCVR(ProcessNode):
     """
     Performs linear regression between regressir data och bold data.
     """
-    outputs = ("dof", "nr_predictors", "design_matrix", "betas", "r_squared",  "r_squared_adjusted", "predictions", "nr_removed_colinear")
+    outputs = ("dof", "nr_predictors", "design_matrix", "betas", "r_squared",  "r_squared_adjusted", "predictions", "nr_removed_colinear", "tsnr")
 
     def _run(self, bold_series : np.ndarray, regressor_series : np.ndarray = None, confounds_df : pd.DataFrame = None, colinear : str = None, colinear_thr : float = 0) -> tuple:
         # check confounds_df
@@ -56,11 +56,14 @@ class RegressCVR(ProcessNode):
         # r_squared
         residuals = non_nan_bs - non_nan_pred
         residual_sum_of_squares = residuals.T @ residuals
-        residual_constant_model = non_nan_bs - np.mean(non_nan_bs)
+        mean_signal = np.mean(non_nan_bs)
+        residual_constant_model = non_nan_bs - mean_signal
         residual_sum_of_squares_constant_model = residual_constant_model.T @ residual_constant_model
         r_squared = 1 - residual_sum_of_squares / residual_sum_of_squares_constant_model if residual_sum_of_squares_constant_model > 0 else np.nan
         r_squared_adjusted = 1 - (1 - r_squared) * (n - 1) / (n - p) if (n - p) > 0 else np.nan
-        return n, p, design_matrix, betas, r_squared, r_squared_adjusted, design_matrix @ betas, nr_colinear
+        # tsnr
+        tsnr = mean_signal / np.sqrt(residual_sum_of_squares / n) if residual_sum_of_squares > 0 else np.nan
+        return n, p, design_matrix, betas, r_squared, r_squared_adjusted, design_matrix @ betas, nr_colinear, tsnr
     
     def _get_colinear_confounds(self, design_matrix : pd.DataFrame, method : str = "corr", threshold : float = 0):
         """
