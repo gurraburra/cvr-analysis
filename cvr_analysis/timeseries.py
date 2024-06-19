@@ -5,7 +5,7 @@ import scipy.signal as sc_signal
 import scipy.stats as sc_stats
 import pandas as pd
 import re
-from nilearn import masking
+from nilearn import masking, signal
 from scipy.interpolate import RegularGridInterpolator
 from scipy.signal import butter, filtfilt
 from collections.abc import Iterable
@@ -93,6 +93,21 @@ class Correlate(ProcessNode):
     """
     outputs = ("timeshift_maxcorr", "maxcorr", "timeshifts", "correlations")
     def _run(self, series_a : np.ndarray, series_b : np.ndarray, time_step : float, lower_limit : int = None, upper_limit : int = None, bipolar : bool = True) -> tuple:
+        # handle leading and trailing nan values (for shifting series)
+        # series a
+        series_a_nan = np.isnan(series_a)
+        series_a_leading_nan = series_a_nan.argmin()
+        series_a_trailing_nan = len(series_a) - series_a_nan[::-1].argmin()
+        if any(series_a_nan[series_a_leading_nan:series_a_trailing_nan]):
+            raise ValueError("Series a contains intermediate nan values.")
+        series_a = series_a[series_a_leading_nan:series_a_trailing_nan]
+        # series b
+        series_b_nan = np.isnan(series_b)
+        series_b_leading_nan = series_b_nan.argmin()
+        series_b_trailing_nan = len(series_b) - series_b_nan[::-1].argmin()
+        if any(series_b_nan[series_b_leading_nan:series_b_trailing_nan]):
+            raise ValueError("Series b contains intermediate nan values.")
+        series_b = series_b[series_b_leading_nan:series_b_trailing_nan]
         # norm factor
         # min_len = min(len(series_a), len(series_b))
         # diff = abs(len(series_a) - len(series_b))
@@ -100,7 +115,7 @@ class Correlate(ProcessNode):
         norm_factor = min(len(series_a), len(series_b))
         # correlate
         correlations = sc_signal.correlate((series_a - series_a.mean()) / series_a.std(), (series_b - series_b.mean()) / series_b.std()) / norm_factor
-        timeshifts = np.arange(-len(series_b)+1, len(series_a), 1) * time_step
+        timeshifts = (np.arange(-len(series_b)+1, len(series_a), 1) + series_a_leading_nan - series_b_leading_nan) * time_step
         # find bound
         mask = np.full_like(timeshifts, True, dtype = bool)
         if lower_limit is not None:
@@ -256,9 +271,9 @@ class UpsampleAll(ProcessNode):
     """
     Upsamples a masked 4D fMRI BOLD data.
     """
-    outputs = ("up_sampling_factor", "new_sample_time", "up_sampled_bold_data", "up_sampled_regressor_series")
+    outputs = ("up_sampling_factor", "new_sample_time", "up_sampled_bold_data", "up_sampled_confounds_df", "up_sampled_regressor_series")
 
-    def _run(self, old_sample_time : float, bold_data : np.ndarray, regressor_series : np.ndarray = None,  min_sample_freq : float = 2) -> tuple:
+    def _run(self, old_sample_time : float, bold_data : np.ndarray, confounds_df : pd.DataFrame, regressor_series : np.ndarray = None,  min_sample_freq : float = 2) -> tuple:
         # up sampling factor
         up_sampling_factor = max(1, int(np.ceil(min_sample_freq * old_sample_time)))
         new_sample_time = old_sample_time / up_sampling_factor
@@ -267,6 +282,8 @@ class UpsampleAll(ProcessNode):
         # bold data
         t_old, t_new = self.oldNewTimes(bold_data.shape[0], up_sampling_factor)
         up_sampled_bold_data = np.apply_along_axis(intp_func, 0, bold_data, t_old = t_old, t_new = t_new)
+        # confounds
+        up_sampled_confounds_df = confounds_df.apply(intp_func, t_old = t_old, t_new = t_new)
         # regressor
         if regressor_series is not None:
             t_old, t_new = self.oldNewTimes(len(regressor_series), up_sampling_factor)
@@ -274,7 +291,7 @@ class UpsampleAll(ProcessNode):
         else:
             up_sampled_regressor_series = None
 
-        return up_sampling_factor, new_sample_time, up_sampled_bold_data, up_sampled_regressor_series
+        return up_sampling_factor, new_sample_time, up_sampled_bold_data, up_sampled_confounds_df, up_sampled_regressor_series
     
     @staticmethod 
     def oldNewTimes(length : int, up_sampling_factor : int):
@@ -290,3 +307,59 @@ class Downsample(ProcessNode):
 
     def _run(self, down_sampling_factor : int, data : np.ndarray) -> tuple:
         return data[::down_sampling_factor], 
+
+class AlignTimeSeries(ProcessNode):
+    outputs = ("aligned_series",)
+
+    def _run(self, series : np.ndarray, timeshift : float, time_step : float, length : int, fill_nan : bool = True) -> tuple:
+        # convert to index
+        timeshift_index = int(round(timeshift / time_step, 0))
+        # fill nan
+        if fill_nan:
+            fill_l = np.nan
+            fill_r = np.nan
+        else:
+            fill_l = series[0]
+            fill_r = series[-1]
+        # handled timeshift
+        if timeshift_index <= 0:
+            series = series[-timeshift_index:]
+        else:
+            series = np.concatenate((np.full(timeshift_index, fill_l), series))
+        # make sure equal length
+        diff = length - len(series)
+        if diff >= 0:
+            series = np.concatenate((series, np.full(diff, fill_r)))
+        else:
+            series = series[:diff]
+        
+        return series, 
+
+
+class CleanData(ProcessNode):
+    outputs = ("cleaned_data", )
+
+    def _run(self, data : np.ndarray, sample_time : float, filter_freq : float, filter_order : int = 5) -> tuple:
+        # check filter freq
+        if isinstance(filter_freq, Iterable):
+            if len(filter_freq) != 2:
+                raise ValueError("'filter_freq' can either be a single value for lowpass filter of list of two values for bandpass filter.")
+            high_pass = filter_freq[0]
+            low_pass = filter_freq[1]
+        else:
+            low_pass = filter_freq
+        # check data type
+        if isinstance(data, np.ndarray):
+            if data.ndim == 1:
+                cleaned_data = signal.clean(data[:,None], detrend=True, standardize=False, t_r=sample_time, low_pass=low_pass, high_pass=high_pass, butterworth_order = filter_order)[:,0] + data.mean()
+            elif data.ndim == 2:
+                cleaned_data = signal.clean(data[:,None], detrend=True, standardize=False, t_r=sample_time, low_pass=low_pass, high_pass=high_pass, butterworth_order = filter_order) + data.mean(axis = 0)
+            else:
+                ValueError(f"Incompatible number of data dimensions: {data.ndim}.")
+        elif isinstance(data, pd.DataFrame):
+            cleaned_data = pd.DataFrame(signal.clean(data.to_numpy(), detrend=True, standardize=True, t_r=sample_time, low_pass=low_pass, high_pass=high_pass, butterworth_order = filter_order),
+                                        index=data.index, columns=data.columns)
+        else:
+            raise ValueError(f"Incompatible data type: {type(data)}.")
+        
+        return cleaned_data, 
