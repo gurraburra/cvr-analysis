@@ -36,9 +36,9 @@ class RegressCVR(ProcessNode):
         if "constant" not in design_matrix:
             design_matrix["constant"] = 1
         # find nan rows
-        nan_rows = design_matrix.isna().any(axis=1)
-        non_nan_dm = design_matrix[~nan_rows]
-        non_nan_bs = bold_series[~nan_rows]
+        nan_entries = design_matrix.isna().any(axis=1) | np.isnan(bold_series)
+        non_nan_dm = design_matrix[~nan_entries]
+        non_nan_bs = bold_series[~nan_entries]
         # handle collinearity
         if colinear is not None:
             colinear_mask = self._get_colinear_confounds(non_nan_dm, method=colinear, threshold=colinear_thr)
@@ -126,27 +126,6 @@ class RegressCVR(ProcessNode):
             return np.array([True if c in colinear_cofounds else False for c in design_matrix.columns])
         else:
             raise ValueError(f"Invalid method for removal of colinearity given: {method}.")
-    
-class AlignRegressor(ProcessNode):
-    outputs = ("aligned_regressor_series",)
-
-    def _run(self, regressor_series : np.ndarray, timeshift_regressor : float, time_step : float, length : int) -> tuple:
-        # convert to index
-        timeshift_index = int(round(timeshift_regressor / time_step, 0))
-        # handled timeshift
-        if timeshift_index <= 0:
-            regressor_series = regressor_series[-timeshift_index:]
-        else:
-            regressor_series = np.concatenate((np.full(timeshift_index, np.nan), regressor_series))
-        # make sure equal length
-        diff = length - len(regressor_series)
-        if diff >= 0:
-            regressor_series = np.concatenate((regressor_series, np.full(diff, np.nan)))
-        else:
-            regressor_series = regressor_series[:diff]
-        
-        return regressor_series, 
-
 
 class CVRAmplitude(ProcessNode):
     outputs = ("cvr_amplitude",)
