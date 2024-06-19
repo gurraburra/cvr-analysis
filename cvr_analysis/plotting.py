@@ -117,7 +117,7 @@ def showCVRAnalysisResult(analysis_file : str):
     data = []
     # get bold data
     try:
-        bold_img = image.load_img(os.path.join(folder, preamble + "_desc-filteredBold_bold.nii.gz"))
+        bold_img = image.load_img(os.path.join(folder, preamble + "_desc-preproc_bold.nii.gz"))
         data.append((stand(bold_img.get_fdata()), "bold"))
     except:
         print("No bold img found")
@@ -129,7 +129,7 @@ def showCVRAnalysisResult(analysis_file : str):
         print("No regressor img found")
     # get predictions
     try:
-        predictions_img = image.load_img(os.path.join(folder, preamble + "_desc-boldPredictions_map.nii.gz"))
+        predictions_img = image.load_img(os.path.join(folder, preamble + "_desc-predictions_bold.nii.gz"))
         data.append((stand(predictions_img.get_fdata()), "prediction"))
     except:
         print("No prediction img found")
