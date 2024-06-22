@@ -9,6 +9,7 @@ from nilearn import masking, signal
 from scipy.interpolate import RegularGridInterpolator
 from scipy.signal import butter, filtfilt
 from collections.abc import Iterable
+from nilearn import glm
 
 class ResampleTimeSeries(ProcessNode):
     """
@@ -339,7 +340,7 @@ class AlignTimeSeries(ProcessNode):
 class CleanData(ProcessNode):
     outputs = ("cleaned_data", )
 
-    def _run(self, data : np.ndarray, sample_time : float, filter_freq : float, filter_order : int = 5) -> tuple:
+    def _run(self, data : np.ndarray, sample_time : float, detrend : bool = False, filter_freq : float = None, filter_order : int = 6, confounds_df : pd.DataFrame = None, standardize : object = False) -> tuple:
         # check filter freq
         if isinstance(filter_freq, Iterable):
             if len(filter_freq) != 2:
@@ -347,19 +348,38 @@ class CleanData(ProcessNode):
             high_pass = filter_freq[0]
             low_pass = filter_freq[1]
         else:
+            high_pass = None
             low_pass = filter_freq
         # check data type
         if isinstance(data, np.ndarray):
             if data.ndim == 1:
-                cleaned_data = signal.clean(data[:,None], detrend=True, standardize=False, t_r=sample_time, low_pass=low_pass, high_pass=high_pass, butterworth_order = filter_order)[:,0] + data.mean()
+                cleaned_data = signal.clean(data[:,None], detrend=detrend, t_r=sample_time, low_pass=low_pass, high_pass=high_pass, butterworth_order = filter_order, confounds=confounds_df, standardize=standardize)[:,0]
             elif data.ndim == 2:
-                cleaned_data = signal.clean(data[:,None], detrend=True, standardize=False, t_r=sample_time, low_pass=low_pass, high_pass=high_pass, butterworth_order = filter_order) + data.mean(axis = 0)
+                cleaned_data = signal.clean(data, detrend=detrend, t_r=sample_time, low_pass=low_pass, high_pass=high_pass, butterworth_order = filter_order, confounds=confounds_df, standardize=standardize)
             else:
                 ValueError(f"Incompatible number of data dimensions: {data.ndim}.")
         elif isinstance(data, pd.DataFrame):
-            cleaned_data = pd.DataFrame(signal.clean(data.to_numpy(), detrend=True, standardize=True, t_r=sample_time, low_pass=low_pass, high_pass=high_pass, butterworth_order = filter_order),
+            cleaned_data = pd.DataFrame(signal.clean(data.to_numpy(), detrend=detrend, t_r=sample_time, low_pass=low_pass, high_pass=high_pass, butterworth_order = filter_order, confounds=confounds_df, standardize=standardize),
                                         index=data.index, columns=data.columns)
         else:
             raise ValueError(f"Incompatible data type: {type(data)}.")
         
         return cleaned_data, 
+
+class DetrendAll(ProcessNode):
+    """
+    Upsamples a masked 4D fMRI BOLD data.
+    """
+    outputs = ("detrended_bold_data", "detrended_confounds_df", "detrended_regressor_series")
+
+    def _run(self, bold_data : np.ndarray, confounds_df : pd.DataFrame, regressor_series : np.ndarray = None, detrend_order : int = 3) -> tuple:
+        # confounds 
+        bids_confounds = glm.first_level.make_first_level_design_matrix(np.arange(bold_data.shape[0]), drift_model = "polynomial", drift_order = detrend_order).drop(columns="constant")
+        regressor_confounds = glm.first_level.make_first_level_design_matrix(np.arange(regressor_series.shape[0]), drift_model = "polynomial", drift_order = detrend_order).drop(columns="constant")
+        # detrend
+        detrend_bold_data = signal.clean(bold_data, confounds=bids_confounds, detrend=False, standardize=False)
+        detrend_confounds_df = pd.DataFrame(signal.clean(confounds_df.to_numpy(), confounds=bids_confounds, detrend=False, standardize=False), 
+                                                index = confounds_df.index, columns = confounds_df.columns)
+        detrend_regressor_series = signal.clean(regressor_series[:,None], confounds=regressor_confounds, detrend=False, standardize=False)[:,0]
+
+        return detrend_bold_data, detrend_confounds_df, detrend_regressor_series
