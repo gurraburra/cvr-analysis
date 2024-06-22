@@ -372,7 +372,7 @@ class DetrendAll(ProcessNode):
     """
     outputs = ("detrended_bold_data", "detrended_confounds_df", "detrended_regressor_series")
 
-    def _run(self, bold_data : np.ndarray, confounds_df : pd.DataFrame, regressor_series : np.ndarray = None, detrend_order : int = 3) -> tuple:
+    def _run(self, bold_data : np.ndarray, confounds_df : pd.DataFrame, regressor_series : np.ndarray = None, detrend_order : int = 1) -> tuple:
         # confounds 
         bids_confounds = glm.first_level.make_first_level_design_matrix(np.arange(bold_data.shape[0]), drift_model = "polynomial", drift_order = detrend_order).drop(columns="constant")
         regressor_confounds = glm.first_level.make_first_level_design_matrix(np.arange(regressor_series.shape[0]), drift_model = "polynomial", drift_order = detrend_order).drop(columns="constant")
