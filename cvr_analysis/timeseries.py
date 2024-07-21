@@ -98,25 +98,36 @@ class Correlate(ProcessNode):
         # series a
         series_a_nan = np.isnan(series_a)
         series_a_leading_nan = series_a_nan.argmin()
-        series_a_trailing_nan = len(series_a) - series_a_nan[::-1].argmin()
-        if any(series_a_nan[series_a_leading_nan:series_a_trailing_nan]):
+        series_a_trailing_nan = series_a_nan[::-1].argmin()
+        if any(series_a_nan[series_a_leading_nan:len(series_a) - series_a_trailing_nan]):
             raise ValueError("Series a contains intermediate nan values.")
-        series_a = series_a[series_a_leading_nan:series_a_trailing_nan]
+        series_a_nan_removed = series_a[series_a_leading_nan:len(series_a) - series_a_trailing_nan]
         # series b
         series_b_nan = np.isnan(series_b)
         series_b_leading_nan = series_b_nan.argmin()
-        series_b_trailing_nan = len(series_b) - series_b_nan[::-1].argmin()
-        if any(series_b_nan[series_b_leading_nan:series_b_trailing_nan]):
+        series_b_trailing_nan = series_b_nan[::-1].argmin()
+        if any(series_b_nan[series_b_leading_nan:len(series_b) - series_b_trailing_nan]):
             raise ValueError("Series b contains intermediate nan values.")
-        series_b = series_b[series_b_leading_nan:series_b_trailing_nan]
+        series_b_nan_removed = series_b[series_b_leading_nan:len(series_b) - series_b_trailing_nan]
         # norm factor
         # min_len = min(len(series_a), len(series_b))
         # diff = abs(len(series_a) - len(series_b))
         # norm_factor = np.concatenate((np.arange(1,min_len,1), np.full(diff + 1, min_len), np.arange(min_len-1,0,-1)))
         norm_factor = min(len(series_a), len(series_b))
         # correlate
-        correlations = sc_signal.correlate((series_a - series_a.mean()) / series_a.std(), (series_b - series_b.mean()) / series_b.std()) / norm_factor
-        timeshifts = (np.arange(-len(series_b)+1, len(series_a), 1) + series_a_leading_nan - series_b_leading_nan) * time_step
+        correlations = sc_signal.correlate(
+                        (series_a_nan_removed - series_a_nan_removed.mean()) / series_a_nan_removed.std(), 
+                            (series_b_nan_removed - series_b_nan_removed.mean()) / series_b_nan_removed.std()) / norm_factor
+        # add nan values
+        correlations = np.concatenate(
+                (
+                    np.full(series_a_leading_nan + series_b_trailing_nan, np.nan), 
+                    correlations,
+                    np.full(series_a_trailing_nan + series_b_leading_nan, np.nan)
+                )
+            )
+        # timeshifts
+        timeshifts = (np.arange(-len(series_b)+1, len(series_a), 1)) * time_step
         # find bound
         mask = np.full_like(timeshifts, True, dtype = bool)
         if lower_limit is not None:
@@ -129,9 +140,9 @@ class Correlate(ProcessNode):
             correlations = correlations[mask]
             timeshifts = timeshifts[mask]
             if bipolar:
-                index = np.argmax(np.abs(correlations))
+                index = np.nanargmax(np.abs(correlations))
             else:
-                index = np.argmax(correlations)
+                index = np.nanargmax(correlations)
         elif lower_limit != None and lower_limit == upper_limit:
             # pick value closet to the limits
             index = np.argmin(np.abs(timeshifts - lower_limit))
