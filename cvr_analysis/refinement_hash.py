@@ -1,10 +1,10 @@
 import hashlib
 
-def refinementDict(filter_type, filter_value, normalization):
+def refinementDict(outlier_filter, outlier_threshold, normalization):
     refinement_info = {
-            "filter_type"                       : filter_type,
-            "filter_value"                      : filter_value,
-            "normalization"                     : normalization,
+            "outlier_filter"                         : outlier_filter,
+            "outlier_threshold"                      : outlier_threshold,
+            "normalization"                          : normalization,
         }
     # analysis id
     analysis_id = hashlib.sha1(str(tuple(refinement_info.items())).encode("UTF-8")).hexdigest()[:7]
