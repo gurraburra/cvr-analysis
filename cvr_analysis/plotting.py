@@ -55,7 +55,7 @@ class IMGShow:
                 self.plot_ax.plot(data[self.pos[0], self.pos[1], self.pos[2]], label = label)
             else:
                 raise ValueError("Incorrect dimensions")
-        self.plot_ax.legend(loc = "lower left")
+        self.plot_ax.legend(loc = "lower left", title = f"val: {self.img[self.pos[0],self.pos[1],self.pos[2]]:.2f}")
         # self.plot_ax.set_aspect('equal')
 
         self.setAxis()
@@ -95,7 +95,7 @@ class IMGShow:
 
     def createColorbar(self):
         cbar_ax = self.fig.add_axes([0.86, 0.2, 0.05, 0.6])
-        cbar_ax.yaxis.set_tick_params(color="white", labelcolor="white")
+        cbar_ax.yaxis.set_tick_params(color="black", labelcolor="black")
         self.fig.colorbar(self.scal_map, cax=cbar_ax)
         
 
@@ -109,7 +109,7 @@ def showCVRAnalysisResult(analysis_file : str):
     folder, analys_file = os.path.split(analysis_file)
     preamble = analys_file.split("_desc-analys_info")[0]
     # cvr file
-    cvr_img = image.load_img(os.path.join(folder, preamble + "_desc-CVRAmplitude_map.nii.gz"))
+    cvr_img = image.load_img(os.path.join(folder, preamble + "_desc-cvrAmplitude_map.nii.gz"))
     # mask cvr file
     cvr_mask = np.abs(cvr_img.get_fdata()) < 1e-10
     cvr_img_masked = np.ma.masked_where(cvr_mask, cvr_img.get_fdata())
