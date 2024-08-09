@@ -1,6 +1,6 @@
 from process_control import ProcessNode
 from bids import BIDSLayout
-from nilearn import image
+from nilearn import image, masking
 import pandas as pd
 import nibabel
 import numpy as np
@@ -15,7 +15,7 @@ class BIDSLoader(ProcessNode):
 class ImageLoader(ProcessNode):
     outputs = ("bold_img", "mask_img", "confounds_df", "events_df", "tr", "nr_measurements")
     
-    def _run(self, bids_layout : BIDSLayout, subject : str, session : str = None, task : str = None, run : str = None, space : str = None, custom_mask : str = None, load_events : bool = True) -> dict:
+    def _run(self, bids_layout : BIDSLayout, subject : str, session : str = None, task : str = None, run : str = None, space : str = None, custom_mask : str = None, load_events : bool = True, remove_negative_voxels : bool = True) -> dict:
         # load bild data
         bold_img = image.load_img(
                         self._checkBIDSQuery("BOLD", 
@@ -44,6 +44,11 @@ class ImageLoader(ProcessNode):
             mask_file = custom_mask
         # make sure mask and bold are in same space
         mask_img = image.resample_to_img(mask_file, bold_img, interpolation="nearest")
+        
+        # remove negative voxels
+        if remove_negative_voxels:
+            mask_img = masking.intersect_masks([mask_img, image.math_img("np.all(img > 0, axis = -1)", img = bold_img)], threshold=1, connected=True)
+
         # load in confounds 
         confounds_df = pd.read_csv(
                             self._checkBIDSQuery("confounds", 
