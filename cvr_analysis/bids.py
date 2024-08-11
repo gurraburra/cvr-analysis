@@ -15,7 +15,7 @@ class BIDSLoader(ProcessNode):
 class ImageLoader(ProcessNode):
     outputs = ("bold_img", "mask_img", "confounds_df", "events_df", "tr", "nr_measurements")
     
-    def _run(self, bids_layout : BIDSLayout, subject : str, session : str = None, task : str = None, run : str = None, space : str = None, custom_mask : str = None, load_events : bool = True, remove_negative_voxels : bool = True) -> dict:
+    def _run(self, bids_layout : BIDSLayout, subject : str, session : str = None, task : str = None, run : str = None, space : str = None, custom_mask : str = None, load_events : bool = True, remove_non_positive_voxels : bool = True) -> dict:
         # load bild data
         bold_img = image.load_img(
                         self._checkBIDSQuery("BOLD", 
@@ -46,7 +46,7 @@ class ImageLoader(ProcessNode):
         mask_img = image.resample_to_img(mask_file, bold_img, interpolation="nearest")
         
         # remove negative voxels
-        if remove_negative_voxels:
+        if remove_non_positive_voxels:
             mask_img = masking.intersect_masks([mask_img, image.math_img("np.all(img > 0, axis = -1)", img = bold_img)], threshold=1, connected=True)
 
         # load in confounds 
