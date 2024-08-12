@@ -7,7 +7,7 @@ import pandas as pd
 def getOutputFiles(path):
     analysis_list = []
 
-    optional_fields = {field : None for field in ["refinement", "task", "run"]}
+    optional_fields = {field : None for field in ["analysis", "refinement", "task", "run"]}
 
     def checkOptionalField(field, regex, file, row):
         try:
@@ -23,12 +23,12 @@ def getOutputFiles(path):
 
     for file in glob(path):
         row = []
-        row.append(re.search("sub-(..)_", file).group(1))
-        row.append(re.search("ses-(..)_", file).group(1))
-        checkOptionalField("task", "task-([^_]*)_", file, row)
-        checkOptionalField("run", "run-(..)_", file, row)
-        row.append(re.search("analys-([^_]*)_", file).group(1))
-        checkOptionalField("refinement", "refinement-([^_]*)_", file, row)
+        row.append(re.search("/sub-(..)_", file).group(1))
+        row.append(re.search("_ses-([^_]*)_", file).group(1))
+        checkOptionalField("task", "_task-([^_]*)_", file, row)
+        checkOptionalField("run", "_run-(..)_", file, row)
+        checkOptionalField("analysis", "_analys-([^_]*)_", file, row)
+        checkOptionalField("refinement", "_refinement-([^_]*)_", file, row)
         row.append(file)
         row.append(datetime.fromtimestamp(os.path.getctime(file)))
         analysis_list.append(row)
@@ -39,7 +39,8 @@ def getOutputFiles(path):
         columns.append("task")
     if optional_fields["run"]:
         columns.append("run")
-    columns.append("analysis")
+    if optional_fields["analysis"]:
+        columns.append("analysis")
     if optional_fields["refinement"]:
         columns.append("refinement")
     columns.extend(["file", "date"])
