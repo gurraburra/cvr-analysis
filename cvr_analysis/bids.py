@@ -4,6 +4,7 @@ from nilearn import image, masking
 import pandas as pd
 import nibabel
 import numpy as np
+import re
 
 class BIDSLoader(ProcessNode):
     outputs = ("bids_layout", )
@@ -13,7 +14,7 @@ class BIDSLoader(ProcessNode):
 
     
 class ImageLoader(ProcessNode):
-    outputs = ("bold_img", "mask_img", "confounds_df", "events_df", "tr", "nr_measurements")
+    outputs = ("bold_img", "mask_img", "mask_description", "confounds_df", "events_df", "tr", "nr_measurements")
     
     def _run(self, bids_layout : BIDSLayout, subject : str, session : str = None, task : str = None, run : str = None, space : str = None, custom_mask : str = None, load_events : bool = True, remove_non_positive_values : bool = True) -> dict:
         # load bild data
@@ -38,12 +39,19 @@ class ImageLoader(ProcessNode):
                                             task=task, 
                                                 run=run, 
                                                     space=space, 
-                                                        suffix="mask", 
-                                                            extension=".nii.gz"))
+                                                        desc = 'brain',
+                                                            suffix="mask", 
+                                                                extension=".nii.gz", invalid_filters='allow'))
+            # make sure mask and bold are in same space
+            mask_img = image.resample_to_img(mask_file, bold_img, interpolation="nearest")
+            mask_desc = "brain"
+        elif custom_mask == "compute_epi_mask":
+            mask_img = masking.compute_epi_mask(bold_img)
+            mask_desc = custom_mask
         else:
-            mask_file = custom_mask
-        # make sure mask and bold are in same space
-        mask_img = image.resample_to_img(mask_file, bold_img, interpolation="nearest")
+            # make sure mask and bold are in same space
+            mask_img = image.resample_to_img(custom_mask, bold_img, interpolation="nearest")
+            mask_desc = re.search("desc-([^_]*)_", custom_mask).group(1)
         
         # remove negative voxels
         if remove_non_positive_values:
@@ -81,7 +89,7 @@ class ImageLoader(ProcessNode):
         # nr_meas
         nr_meas = bold_img.shape[3]
         
-        return bold_img, mask_img, confounds_df, events_df, tr, nr_meas
+        return bold_img, mask_img, mask_desc, confounds_df, events_df, tr, nr_meas
 
     def _checkBIDSQuery(self, file : str, files : list[str]) -> str:
         if len(files) == 0:
