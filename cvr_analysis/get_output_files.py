@@ -4,39 +4,45 @@ import os
 from datetime import datetime
 import pandas as pd
 
-def getOutputFiles(path, include_run = True):
+def getOutputFiles(path):
     analysis_list = []
-    refinement_info_exist = None
+
+    optional_fields = {field : None for field in ["refinement", "task", "run"]}
+
+    def checkOptionalField(field, regex, file, row):
+        try:
+            row.append(re.search(regex, file).group(1))
+            if optional_fields[field] == False:
+                raise RuntimeError(f"Inconistent field: {field}")
+            optional_fields[field] = True
+        except:
+            if optional_fields[field] == True:
+                raise RuntimeError(f"Inconistent field: {field}")
+            else:
+                optional_fields[field] = False
+
     for file in glob(path):
         row = []
         row.append(re.search("sub-(..)_", file).group(1))
         row.append(re.search("ses-(..)_", file).group(1))
-        if include_run:
-            row.append(re.search("run-(..)_", file).group(1))
-        row.append(re.search("task-([^_]*)_", file).group(1))
-        row.append(re.search("_analys-([^_]*)_", file).group(1))
-        try:
-            row.append(re.search("_refinement-([^_]*)_", file).group(1))
-            if refinement_info_exist == False:
-                raise RuntimeError("Inconistent refinement")
-            refinement_info_exist = True
-        except:
-            if refinement_info_exist == True:
-                raise RuntimeError("Inconistent refinement")
-            else:
-                refinement_info_exist = False
+        checkOptionalField("task", "task-([^_]*)_", file, row)
+        checkOptionalField("run", "run-(..)_", file, row)
+        row.append(re.search("analys-([^_]*)_", file).group(1))
+        checkOptionalField("refinement", "refinement-([^_]*)_", file, row)
         row.append(file)
         row.append(datetime.fromtimestamp(os.path.getctime(file)))
         analysis_list.append(row)
     
     # columns
     columns=["subject", "session"]
-    if include_run:
+    if optional_fields["task"]:
+        columns.append("task")
+    if optional_fields["run"]:
         columns.append("run")
-    columns += ["task", "analysis"]
-    if refinement_info_exist == True:
+    columns.append("analysis")
+    if optional_fields["refinement"]:
         columns.append("refinement")
-    columns += ["file", "date"]
+    columns.extend(["file", "date"])
 
     return pd.DataFrame(analysis_list, columns=columns)
     
