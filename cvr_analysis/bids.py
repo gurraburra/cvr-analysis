@@ -39,8 +39,9 @@ class ImageLoader(ProcessNode):
                                             task=task, 
                                                 run=run, 
                                                     space=space, 
-                                                        suffix="mask", 
-                                                            extension=".nii.gz"))
+                                                        desc='brain',
+                                                            suffix="mask", 
+                                                                extension=".nii.gz"))
         else:
             mask_file = custom_mask
         # make sure mask and bold are in same space
@@ -54,7 +55,7 @@ class ImageLoader(ProcessNode):
         mask_img.set_filename(mask_file)
         # mask description
         try:
-            mask_desc = re.search("desc-([^_]*)_", mask_file).group(1)
+            mask_desc = re.search("_desc-([^_]*)_", mask_file).group(1)
         except:
             mask_desc = None
 
