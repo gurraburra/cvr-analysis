@@ -27,6 +27,7 @@ def getOutputFiles(path):
         row.append(re.search("_ses-([^_]*)_", file).group(1))
         checkOptionalField("task", "_task-([^_]*)_", file, row)
         checkOptionalField("run", "_run-(..)_", file, row)
+        row.append(re.search("_space-([^_]*)_", file).group(1))
         checkOptionalField("analysis", "_analys-([^_]*)_", file, row)
         checkOptionalField("refinement", "_refinement-([^_]*)_", file, row)
         row.append(file)
@@ -39,6 +40,7 @@ def getOutputFiles(path):
         columns.append("task")
     if optional_fields["run"]:
         columns.append("run")
+    columns.append("space")
     if optional_fields["analysis"]:
         columns.append("analysis")
     if optional_fields["refinement"]:
