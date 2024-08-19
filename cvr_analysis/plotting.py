@@ -27,7 +27,7 @@ class IMGShow:
         self.pos = [20,30,20]
         self.update()
         # colormap
-        norm = mpl.colors.Normalize(vmin = -self.settings["vmax"], vmax = self.settings["vmax"])
+        norm = mpl.colors.Normalize(vmin = self.settings["vmin"], vmax = self.settings["vmax"])
         self.scal_map = mpl.cm.ScalarMappable(norm=norm, cmap=self.settings["cmap"])
         # self.fig.set_facecolor("black")
         self.createColorbar()
@@ -102,9 +102,9 @@ class IMGShow:
 def stand(sig):
     return (sig - np.nanmean(sig, axis = -1)[..., np.newaxis]) / np.nanstd(sig, axis = -1)[..., np.newaxis]
 
-def showCVRAnalysisResult(analysis_file : str):
+def showCVRAnalysisResult(analysis_file : str, vmin = -1, vmax = 1):
     # settings
-    settings = {"cmap" : "RdYlBu_r", "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower"}
+    settings = {"cmap" : "RdYlBu_r", "vmin" : vmin, "vmax" : vmax, "aspect" : "equal", "origin" : "lower"}
     # folder preamble
     folder, analys_file = os.path.split(analysis_file)
     preamble = analys_file.split("_desc-analys_info")[0]
