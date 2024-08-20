@@ -5,7 +5,7 @@ import scipy.signal as sc_signal
 import scipy.stats as sc_stats
 import pandas as pd
 import re
-from nilearn import masking, signal
+from nilearn import masking, signal, image
 from scipy.interpolate import RegularGridInterpolator
 from scipy.signal import butter, filtfilt
 from collections.abc import Iterable
@@ -215,7 +215,10 @@ class GetTimeSeriesEvent(ProcessNode):
 class MaskImage(ProcessNode):
     outputs = ("output_data",)
     
-    def _run(self, input_img, mask_img, smoothing_fwhm = None) -> tuple:
+    def _run(self, input_img, mask_img, smoothing_fwhm = None, ensure_no_mixing = True) -> tuple:
+        # if voxels should not be mixed in by smoothing -> mask and unmask before smoothing
+        if ensure_no_mixing:
+            input_img = image.math_img('img * np.array(mask, dtype=bool)[...,None]', img = input_img, mask = mask_img)
         return masking.apply_mask(input_img, mask_img, smoothing_fwhm=smoothing_fwhm), 
 
 class UnmaskData(ProcessNode):
