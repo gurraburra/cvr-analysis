@@ -3,3 +3,4 @@ usefull_notebooks
 *.egg-info
 *pycache*
 .vscode
+test*

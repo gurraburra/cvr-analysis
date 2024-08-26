@@ -1,0 +1,15 @@
+name: myenv
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - pip
+  - pandas
+  - numpy
+  - nilearn
+  - pybids
+  - multiprocess
+  - tqdm
+  - scikit-learn
+  - matplotlib
+  - statsmodels
