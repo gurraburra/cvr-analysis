@@ -12,7 +12,6 @@ import pandas as pd
 import ast
 import pprint
 
-
 def handleNone(type_, arg):
     if arg == "None":
         return None
@@ -318,15 +317,15 @@ if __name__ == "__main__":
 
             # print args if verbose
             if args.verbose:
+                print()
                 print("Iterating arguments:")
-                pprint.pprint(iter_args_dict)
+                pprint.pp(iter_args_dict, sort_dicts=False)
                 print()
 
             # run workflow
             cvr_wf.run(ignore_cache = False, save_data = True,
                                 bids_directory = args.bids_dir, verbose = args.verbose, force_run = args.force_run, full_output = args.full_output, output_directory = args.output_dir, 
                                         **iter_args_dict)
-                                                            
 
     # done
     print()
