@@ -46,14 +46,14 @@ def createHashCheckOverride(
         "voxel-mask"                                : str(voxel_mask),
         "roi_masker"                                : try_conv(roi_masker, str),
         "spatial-smoothing-fwhm"                    : try_conv(spatial_smoothing_fwhm, float),
-        "analysis-bounds"                           : try_conv((analysis_start_time, analysis_end_time), float),
         "min-sample-freq"                           : try_conv(min_sample_freq, float),
+        "analysis-bounds"                           : try_conv((analysis_start_time, analysis_end_time), float),
         "linear-detrend-order"                      : try_conv(linear_detrend_order, int),
         "temporal-filter-freq"                      : try_conv(temporal_filter_freq, float),
         "use-co2-regressor"                         : bool(use_co2_regressor),
-        "maxcorr-bipolar"                           : bool(maxcorr_bipolar),
-        "align-regressor-bounds"                    : try_conv((align_regressor_lower_bound, align_regressor_upper_bound), float),
         "motion-regressor-correlation-threshold"    : try_conv(motion_regressor_correlation_threshold, float),
+        "align-regressor-bounds"                    : try_conv((align_regressor_lower_bound, align_regressor_upper_bound), float),
+        "maxcorr-bipolar"                           : bool(maxcorr_bipolar),
     }
 
     # analysis id
