@@ -34,6 +34,5 @@ WORKDIR /app
 
 # Python program to run in the container
 COPY run.py .
-ADD workflows ./workflows
 
 ENTRYPOINT ["mamba", "run", "--no-capture-output", "-n", "myenv", "python", "/app/run.py"]
