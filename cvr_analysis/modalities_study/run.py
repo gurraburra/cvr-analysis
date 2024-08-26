@@ -225,7 +225,7 @@ if __name__ == "__main__":
     # check additional parameter options
     if args.parameter_list_file is not None:
         # read in parameter list
-        parameter_list = pd.read_csv(args.parameter_list_file, sep='\t').fillna(np.nan).replace([np.nan], [None])
+        parameter_list = pd.read_csv(args.parameter_list_file, sep='\t')
         # check all parameters are in options
         for c in parameter_list.columns:
             assert c in options, f"Parameter '{c}' is not a valid option."
@@ -240,6 +240,8 @@ if __name__ == "__main__":
         for c_name, func in converters.items():
             if c_name in parameter_list.columns:
                 parameter_list[c_name] = parameter_list[c_name].apply(func)
+        # replace nan with None
+        parameter_list = parameter_list.fillna(np.nan).replace([np.nan], [None])
         # product options
         product_options = {f : options[f] for f in options if f not in parameter_list.columns}
         product_samples = iter_product(*product_options.values())
@@ -303,7 +305,7 @@ if __name__ == "__main__":
     # limit nr threads using threadpoolctl
     with threadpool_limits(limits=args.omp_threads):
         # loop through iterations
-        for iter_ in tqdm(iters):
+        for iter_ in tqdm(iters, miniters = 1):
             # replace - with _
             iter_args_dict = {factor.replace("-","_") : value for factor, value in zip(ordered_factors,iter_)}
 
@@ -319,7 +321,7 @@ if __name__ == "__main__":
                 print("Iterating arguments:")
                 pprint.pprint(iter_args_dict)
                 print()
-            
+
             # run workflow
             cvr_wf.run(ignore_cache = False, save_data = True,
                                 bids_directory = args.bids_dir, verbose = args.verbose, force_run = args.force_run, full_output = args.full_output, output_directory = args.output_dir, 
