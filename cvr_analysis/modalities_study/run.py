@@ -229,8 +229,14 @@ if __name__ == "__main__":
         # check all parameters are in options
         for c in parameter_list.columns:
             assert c in options, f"Parameter '{c}' is not a valid option."
+        # check before conversion
+        def applyLiteralEvalStr(val):
+            if isinstance(val, str):
+                return ast.literal_eval(val)
+            else:
+                return val
         # handle conversion
-        converters={"align-regressor-bounds": ast.literal_eval, "analysis-bounds": ast.literal_eval, "temporal-filter-freq": ast.literal_eval}
+        converters={"align-regressor-bounds": applyLiteralEvalStr, "analysis-bounds": applyLiteralEvalStr, "temporal-filter-freq": applyLiteralEvalStr}
         for c_name, func in converters.items():
             if c_name in parameter_list.columns:
                 parameter_list[c_name] = parameter_list[c_name].apply(func)
