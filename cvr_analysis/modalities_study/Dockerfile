@@ -32,4 +32,4 @@ RUN pip install .
 # set workdir back to app
 WORKDIR /app
 
-ENTRYPOINT ["mamba", "run", "--no-capture-output", "-n", "myenv", "python", "-m" "cvr_analysis.modalities_study.run"]
+ENTRYPOINT ["mamba", "run", "--no-capture-output", "-n", "myenv", "python", "-m", "cvr_analysis.modalities_study.run"]
