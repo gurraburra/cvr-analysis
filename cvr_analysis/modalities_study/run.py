@@ -319,7 +319,7 @@ if __name__ == "__main__":
             if args.verbose:
                 print()
                 print("Iterating arguments:")
-                pprint.pp(iter_args_dict, sort_dicts=False)
+                pprint.pp(iter_args_dict, sort_dicts=True)
                 print()
 
             # run workflow
