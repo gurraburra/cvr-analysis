@@ -32,7 +32,4 @@ RUN pip install .
 # set workdir back to app
 WORKDIR /app
 
-# Python program to run in the container
-COPY run.py .
-
-ENTRYPOINT ["mamba", "run", "--no-capture-output", "-n", "myenv", "python", "/app/run.py"]
+ENTRYPOINT ["mamba", "run", "--no-capture-output", "-n", "myenv", "python", "-m" "cvr_analysis.modalities_study.run"]
