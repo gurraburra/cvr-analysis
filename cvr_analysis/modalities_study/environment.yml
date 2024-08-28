@@ -13,3 +13,5 @@ dependencies:
   - scikit-learn
   - matplotlib
   - statsmodels
+  - pip:
+    - wakepy
