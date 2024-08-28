@@ -98,9 +98,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # print
-    print("----- CVR analysis -----")
-    print("Arguments:")
-    pprint.pprint(vars(args))
+    if args.verbose:
+        print("----- CVR analysis -----")
+        print("Arguments:")
+        pprint.pp(vars(args), sort_dicts=True)
 
     # check particpant label
     if args.participant_label is None:
@@ -183,23 +184,19 @@ if __name__ == "__main__":
     else:
         bipolar_options = args.maxcorr_bipolar
     
-    
-    print()
     # get number of cores to use
     if args.nprocs <= -1:
          nprocs = cpu_count()
     else:
          nprocs = args.nprocs
-    if nprocs > 1:
-         parallel_processing = True
-    else:
-         parallel_processing = False
-    print(f"Using {nprocs} processes and omp-threads limited to {args.omp_threads}.")
-    print("--------------------")
-    print()
+    if args.verbose:
+        print()
+        print(f"Using {nprocs} processes and omp-threads limited to {args.omp_threads}.")
+        print("--------------------")
+        print()
 
-    print("Creating iterations")
-    print("--------------------")
+        print("Creating iterations")
+        print("--------------------")
     # option names
     options = {
         "subject" : sub_options,
@@ -289,18 +286,20 @@ if __name__ == "__main__":
         iters = np.array(tuple(iter_product(*options.values())), dtype=object)
     # sort factors
     iters = iters[np.lexsort(np.vectorize(str)(iters[:,::-1].T))]
-    print(f"Number of iterations: {len(iters)}")
-    print()
+    if args.verbose:
+        print(f"Number of iterations: {len(iters)}")
+        print()
 
-    # create workflow
-    print("Creating workflow")
-    print("--------------------")
+        # create workflow
+        print("Creating workflow")
+        print("--------------------")
+    
+        print()
+        print("Running workflow")
+        print("--------------------")
+
     # load in from separate module
     from cvr_analysis.modalities_study import cvr_wf
-    print()
-
-    print("Running workflow")
-    print("--------------------")
 
     # make sure system dont go to sleep
     with keep.running():
@@ -331,6 +330,7 @@ if __name__ == "__main__":
                                             **iter_args_dict)
 
     # done
-    print()
-    print("--- Done ---")
-    print()
+    if args.verbose:
+        print()
+        print("--- Done ---")
+        print()
