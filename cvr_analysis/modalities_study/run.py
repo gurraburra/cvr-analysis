@@ -96,12 +96,6 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
-    
-    # print
-    if args.verbose:
-        print("----- CVR analysis -----")
-        print("Arguments:")
-        pprint.pp(vars(args), sort_dicts=True)
 
     # check particpant label
     if args.participant_label is None:
@@ -189,14 +183,7 @@ if __name__ == "__main__":
          nprocs = cpu_count()
     else:
          nprocs = args.nprocs
-    if args.verbose:
-        print()
-        print(f"Using {nprocs} processes and omp-threads limited to {args.omp_threads}.")
-        print("--------------------")
-        print()
-
-        print("Creating iterations")
-        print("--------------------")
+    
     # option names
     options = {
         "subject" : sub_options,
@@ -286,20 +273,19 @@ if __name__ == "__main__":
         iters = np.array(tuple(iter_product(*options.values())), dtype=object)
     # sort factors
     iters = iters[np.lexsort(np.vectorize(str)(iters[:,::-1].T))]
-    if args.verbose:
-        print(f"Number of iterations: {len(iters)}")
-        print()
-
-        # create workflow
-        print("Creating workflow")
-        print("--------------------")
-    
-        print()
-        print("Running workflow")
-        print("--------------------")
 
     # load in from separate module
     from cvr_analysis.modalities_study import cvr_wf
+
+    # print
+    if args.verbose:
+        print("----- CVR analysis -----")
+        print()
+        print(f"Using {nprocs} processes and omp-threads limited to {args.omp_threads}.")
+        print("--------------------")
+        print()
+        print(f"Number of iterations: {len(iters)}")
+        print("--------------------")
 
     # make sure system dont go to sleep
     with keep.running():
