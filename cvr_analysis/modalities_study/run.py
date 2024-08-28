@@ -11,7 +11,6 @@ import warnings
 import pandas as pd
 import ast
 import pprint
-from wakepy import keep
 
 def handleNone(type_, arg):
     if arg == "None":
@@ -286,33 +285,31 @@ if __name__ == "__main__":
     print(f"Number of iterations: {len(iters)}")
     print("--------------------")
 
-    # make sure system dont go to sleep
-    with keep.running():
-        # limit nr threads using threadpoolctl
-        with threadpool_limits(limits=args.omp_threads):
-            # loop through iterations
-            for iter_ in tqdm(iters, miniters = 1):
-                # replace - with _
-                iter_args_dict = {factor.replace("-","_") : value for factor, value in zip(ordered_factors,iter_)}
+    # limit nr threads using threadpoolctl
+    with threadpool_limits(limits=args.omp_threads):
+        # loop through iterations
+        for iter_ in tqdm(iters, miniters = 1):
+            # replace - with _
+            iter_args_dict = {factor.replace("-","_") : value for factor, value in zip(ordered_factors,iter_)}
 
-                # unpack align regressor bounds
-                iter_args_dict["align_regressor_lower_bound"], iter_args_dict["align_regressor_upper_bound"] = iter_args_dict["align_regressor_bounds"]
-                del iter_args_dict["align_regressor_bounds"]
-                # unpack analysis bounds
-                iter_args_dict["analysis_start_time"], iter_args_dict["analysis_end_time"] = iter_args_dict["analysis_bounds"]
-                del iter_args_dict["analysis_bounds"]
+            # unpack align regressor bounds
+            iter_args_dict["align_regressor_lower_bound"], iter_args_dict["align_regressor_upper_bound"] = iter_args_dict["align_regressor_bounds"]
+            del iter_args_dict["align_regressor_bounds"]
+            # unpack analysis bounds
+            iter_args_dict["analysis_start_time"], iter_args_dict["analysis_end_time"] = iter_args_dict["analysis_bounds"]
+            del iter_args_dict["analysis_bounds"]
 
-                # print args if verbose
-                if args.verbose:
-                    print()
-                    print("Iterating arguments:")
-                    pprint.pp(iter_args_dict, sort_dicts=True)
-                    print()
+            # print args if verbose
+            if args.verbose:
+                print()
+                print("Iterating arguments:")
+                pprint.pp(iter_args_dict, sort_dicts=True)
+                print()
 
-                # run workflow
-                cvr_wf.run(ignore_cache = False, save_data = True, nr_processes = nprocs,
-                                    bids_directory = args.bids_dir, verbose = args.verbose, force_run = args.force_run, full_output = args.full_output, output_directory = args.output_dir, 
-                                            **iter_args_dict)
+            # run workflow
+            cvr_wf.run(ignore_cache = False, save_data = True, nr_processes = nprocs,
+                                bids_directory = args.bids_dir, verbose = args.verbose, force_run = args.force_run, full_output = args.full_output, output_directory = args.output_dir, 
+                                        **iter_args_dict)
 
     # done
     if args.verbose:
