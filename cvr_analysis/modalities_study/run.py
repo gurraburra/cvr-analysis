@@ -50,7 +50,7 @@ if __name__ == "__main__":
     parser.add_argument('output_dir', type=str, help='output folder')
     parser.add_argument('analysis_level', type=str, choices=["participant"], default="participant", nargs="?", help='which level of analysis')
     parser.add_argument('--nprocs', type=int, default=-1, help='number of cpus to be used')
-    parser.add_argument('--omp-threads', '--nthreads-per-proc', type=int, help='number of threads per process')
+    parser.add_argument('--omp-threads', '--nthreads-per-proc', type=partial(handleNone, int), help='number of threads per process')
     parser.add_argument('--force-run', action='store_true', help='flag specifing if old data files should be overriden')
     parser.add_argument('--full-output', action='store_true', help='flag specifing if all output files should be saved')
     parser.add_argument('--verbose', action='store_true', help='verbose printing or not')
@@ -194,7 +194,7 @@ if __name__ == "__main__":
          parallel_processing = True
     else:
          parallel_processing = False
-    print(f"Using {nprocs} cores.")
+    print(f"Using {nprocs} processes and omp-threads limited to {args.omp_threads}.")
     print("--------------------")
     print()
 
@@ -326,7 +326,7 @@ if __name__ == "__main__":
                     print()
 
                 # run workflow
-                cvr_wf.run(ignore_cache = False, save_data = True,
+                cvr_wf.run(ignore_cache = False, save_data = True, nr_processes = nprocs,
                                     bids_directory = args.bids_dir, verbose = args.verbose, force_run = args.force_run, full_output = args.full_output, output_directory = args.output_dir, 
                                             **iter_args_dict)
 
