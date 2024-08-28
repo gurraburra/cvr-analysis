@@ -8,10 +8,10 @@ RUN mamba update mamba
 
 # Create Conda environment from the YAML file
 COPY environment.yml .
-RUN mamba env create -f environment.yml
+RUN mamba env create -n cvr -f environment.yml
 
 # Override default shell and use bash
-SHELL ["mamba", "run", "-n", "myenv", "/bin/bash", "-c"] 
+SHELL ["mamba", "run", "-n", "cvr", "/bin/bash", "-c"] 
 
 # get custom packages package
 RUN mkdir /custom-packages
@@ -32,4 +32,4 @@ RUN pip install .
 # set workdir back to app
 WORKDIR /app
 
-ENTRYPOINT ["mamba", "run", "--no-capture-output", "-n", "myenv", "python", "-m", "cvr_analysis.modalities_study.run"]
+ENTRYPOINT ["mamba", "run", "--no-capture-output", "-n", "cvr", "python", "-m", "cvr_analysis.modalities_study.run"]

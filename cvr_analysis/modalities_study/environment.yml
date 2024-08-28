@@ -1,4 +1,4 @@
-name: myenv
+name: cvr
 channels:
   - conda-forge
 dependencies:
