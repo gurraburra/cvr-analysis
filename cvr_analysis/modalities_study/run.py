@@ -278,14 +278,13 @@ if __name__ == "__main__":
     from cvr_analysis.modalities_study import cvr_wf
 
     # print
-    if args.verbose:
-        print("----- CVR analysis -----")
-        print()
-        print(f"Using {nprocs} processes and omp-threads limited to {args.omp_threads}.")
-        print("--------------------")
-        print()
-        print(f"Number of iterations: {len(iters)}")
-        print("--------------------")
+    print("----- CVR analysis -----")
+    print()
+    print(f"Using {nprocs} processes and omp-threads limited to {args.omp_threads}.")
+    print("--------------------")
+    print()
+    print(f"Number of iterations: {len(iters)}")
+    print("--------------------")
 
     # make sure system dont go to sleep
     with keep.running():
