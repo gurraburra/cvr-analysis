@@ -134,6 +134,8 @@ new_sampling_time = NewSampleTime(description="calculate new sample time and ups
 resample_bold_timeseries = ResampleTimeSeries(description="resample bold timeseries")
 resample_confounds_df = ResampleTimeSeries(description="resample confounds df")
 resample_co2_series = ResampleTimeSeries(description="resample co2 series")
+co2_timeseries_padding = ValueNode(0.0)
+zero_timeseries_padding = ValueNode(0.0)
 
 # resample time wf
 resample_wf = ProcessWorkflow(
@@ -148,6 +150,8 @@ resample_wf = ProcessWorkflow(
         (ProcessWorkflow.input.analysis_start_time, resample_bold_timeseries.input.start_time),
         (ProcessWorkflow.input.analysis_end_time, resample_bold_timeseries.input.end_time),
         (new_sampling_time.output.new_sample_time, resample_bold_timeseries.input.sample_time),
+        (zero_timeseries_padding.output.value, resample_bold_timeseries.input.padding),
+        (resample_bold_timeseries.output.resampled_times, ProcessWorkflow.output.resampled_bold_times),
         (resample_bold_timeseries.output.resampled_timeseries, ProcessWorkflow.output.resampled_bold_timeseries),
         # resample confounds
         (ProcessWorkflow.input.bold_times, resample_confounds_df.input.times),
@@ -155,13 +159,17 @@ resample_wf = ProcessWorkflow(
         (ProcessWorkflow.input.analysis_start_time, resample_confounds_df.input.start_time),
         (ProcessWorkflow.input.analysis_end_time, resample_confounds_df.input.end_time),
         (new_sampling_time.output.new_sample_time, resample_confounds_df.input.sample_time),
+        (zero_timeseries_padding.output.value, resample_confounds_df.input.padding),
+        (resample_confounds_df.output.resampled_times, ProcessWorkflow.output.resampled_confounds_df_times),
         (resample_confounds_df.output.resampled_timeseries, ProcessWorkflow.output.resampled_confounds_df),
         # resample co2 timeseries
         (ProcessWorkflow.input.co2_times, resample_co2_series.input.times),
         (ProcessWorkflow.input.co2_timeseries, resample_co2_series.input.timeseries),
-        (ValueNode(None).output.value, resample_co2_series.input.start_time),
-        (ValueNode(None).output.value, resample_co2_series.input.end_time),
+        (ProcessWorkflow.input.analysis_start_time, resample_co2_series.input.start_time),
+        (ProcessWorkflow.input.analysis_end_time, resample_co2_series.input.end_time),
         (new_sampling_time.output.new_sample_time, resample_co2_series.input.sample_time),
+        (co2_timeseries_padding.output.value, resample_co2_series.input.padding),
+        (resample_co2_series.output.resampled_times, ProcessWorkflow.output.resampled_co2_times),
         (resample_co2_series.output.resampled_timeseries, ProcessWorkflow.output.resampled_co2_timeseries),
     ),
     description="resampling workflow"
@@ -179,14 +187,20 @@ detrend_co2_series = DetrendTimeSeries(description="detrend co2 series")
 detrend_wf = ProcessWorkflow(
     (
         # detrend bold timeseries
+        (ProcessWorkflow.input.sample_time, detrend_bold_timeseries.input.sample_time),
+        (ProcessWorkflow.input.linear_detrend_type, detrend_bold_timeseries.input.detrend_type),
         (ProcessWorkflow.input.linear_detrend_order, detrend_bold_timeseries.input.detrend_order),
         (ProcessWorkflow.input.bold_timeseries, detrend_bold_timeseries.input.timeseries),
         (detrend_bold_timeseries.output.detrended_timeseries, ProcessWorkflow.output.detrended_bold_timeseries),
         # detrend confounds
+        (ProcessWorkflow.input.sample_time, detrend_confounds_df.input.sample_time),
+        (ProcessWorkflow.input.linear_detrend_type, detrend_confounds_df.input.detrend_type),
         (ProcessWorkflow.input.linear_detrend_order, detrend_confounds_df.input.detrend_order),
         (ProcessWorkflow.input.confounds_df, detrend_confounds_df.input.timeseries),
         (detrend_confounds_df.output.detrended_timeseries, ProcessWorkflow.output.detrended_confounds_df),
         # detrend co2 timeseries
+        (ProcessWorkflow.input.sample_time, detrend_co2_series.input.sample_time),
+        (ProcessWorkflow.input.linear_detrend_type, detrend_co2_series.input.detrend_type),
         (ProcessWorkflow.input.linear_detrend_order, detrend_co2_series.input.detrend_order),
         (ProcessWorkflow.input.co2_timeseries, detrend_co2_series.input.timeseries),
         (detrend_co2_series.output.detrended_timeseries, ProcessWorkflow.output.detrended_co2_timeseries),
@@ -231,10 +245,6 @@ temporal_filter_wf = ProcessWorkflow(
 )
 
 # %%
-##############################################
-# downsample confounds
-##############################################
-down_sample_confounds_df = DownsampleTimeSeries(description="down sample confounds df")
 
 # signal processing wf
 signal_processing_wf = ProcessWorkflow(
@@ -244,7 +254,9 @@ signal_processing_wf = ProcessWorkflow(
         (resample_wf.output.up_sampling_factor, ProcessWorkflow.output.up_sampling_factor),
         (resample_wf.output.new_sample_time, ProcessWorkflow.output.up_sampled_sample_time),
         # detrend wf
+        (ProcessWorkflow.input.linear_detrend_type, detrend_wf.input.linear_detrend_type),
         (ProcessWorkflow.input.linear_detrend_order, detrend_wf.input.linear_detrend_order),
+        (resample_wf.output.new_sample_time, detrend_wf.input.sample_time),
         (resample_wf.output.resampled_bold_timeseries, detrend_wf.input.bold_timeseries),
         (resample_wf.output.resampled_confounds_df, detrend_wf.input.confounds_df),
         (resample_wf.output.resampled_co2_timeseries, detrend_wf.input.co2_timeseries),
@@ -256,10 +268,7 @@ signal_processing_wf = ProcessWorkflow(
         (detrend_wf.output.detrended_co2_timeseries, temporal_filter_wf.input.co2_timeseries),
         (temporal_filter_wf.output.temporal_filtered_bold_timeseries, ProcessWorkflow.output.temporal_filtered_detrended_up_sampled_bold_timeseries),
         (temporal_filter_wf.output.temporal_filtered_co2_timeseries, ProcessWorkflow.output.temporal_filtered_detrended_up_sampled_co2_timeseries),
-        # down sample confounds
-        (resample_wf.output.up_sampling_factor, down_sample_confounds_df.input.down_sampling_factor),
-        (temporal_filter_wf.output.temporal_filtered_confounds_df, down_sample_confounds_df.input.timeseries),
-        (down_sample_confounds_df.output.down_sampled_timeseries, ProcessWorkflow.output.temporal_filtered_detrended_confounds_df)
+        (temporal_filter_wf.output.temporal_filtered_confounds_df, ProcessWorkflow.output.temporal_filtered_detrended_up_sampled_confounds_df),
     ),
     description="signal processing workflow"
 )
@@ -276,7 +285,7 @@ post_processing_wf = ProcessWorkflow(
         (data_loader_wf.output.timeseries_masker, ProcessWorkflow.output.timeseries_masker),
         (data_loader_wf.output.tr, ProcessWorkflow.output.bold_tr),
         # signal processing wf
-        (ProcessWorkflow.input._, signal_processing_wf.input[("min_sample_freq", "analysis_start_time", "analysis_end_time", "linear_detrend_order", "temporal_filter_freq")]),
+        (ProcessWorkflow.input._, signal_processing_wf.input[("min_sample_freq", "analysis_start_time", "analysis_end_time", "linear_detrend_order", "linear_detrend_type", "temporal_filter_freq")]),
         (data_loader_wf.output.tr, signal_processing_wf.input.bold_tr),
         (data_loader_wf.output.bold_times, signal_processing_wf.input.bold_times),
         (data_loader_wf.output.bold_timeseries, signal_processing_wf.input.bold_timeseries),

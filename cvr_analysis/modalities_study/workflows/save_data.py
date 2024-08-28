@@ -19,7 +19,7 @@ def createHashCheckOverride(
                         output_directory, subject, session, task, run, space,
                                 voxel_mask, roi_masker, spatial_smoothing_fwhm, 
                                     analysis_start_time, analysis_end_time, min_sample_freq, 
-                                        linear_detrend_order, temporal_filter_freq, 
+                                        linear_detrend_type, linear_detrend_order, temporal_filter_freq, 
                                             use_co2_regressor, motion_regressor_correlation_threshold,
                                                 maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound,
                                                     force_run = False):
@@ -38,7 +38,18 @@ def createHashCheckOverride(
         
     # check voxel_mask, don't allow 'None' since might lead to ambigious behaviour 
     if voxel_mask is None:
-        raise ValueError(f"Please specify which voxel mask to be used")
+        raise ValueError(f"please specify which voxel mask to be used")
+    
+    # check linear detrend type
+    if linear_detrend_type == "linear":
+        type_linear_order = int
+    elif linear_detrend_type == "endpoints":
+        type_linear_order = float
+    else:
+        raise ValueError("linear_detrend_type must either be 'linear' or 'endpoints'")
+    # check if linear detrend order = None -> set type = None
+    if linear_detrend_order is None:
+        linear_detrend_type = None
    
     # analysis info
     analysis_info = {
@@ -48,7 +59,8 @@ def createHashCheckOverride(
         "spatial-smoothing-fwhm"                    : try_conv(spatial_smoothing_fwhm, float),
         "min-sample-freq"                           : try_conv(min_sample_freq, float),
         "analysis-bounds"                           : try_conv((analysis_start_time, analysis_end_time), float),
-        "linear-detrend-order"                      : try_conv(linear_detrend_order, int),
+        "linear-detrend-type"                       : try_conv(linear_detrend_type, str),
+        "linear-detrend-order"                      : try_conv(linear_detrend_order, type_linear_order),
         "temporal-filter-freq"                      : try_conv(temporal_filter_freq, float),
         "use-co2-regressor"                         : bool(use_co2_regressor),
         "motion-regressor-correlation-threshold"    : try_conv(motion_regressor_correlation_threshold, float),
@@ -63,9 +75,9 @@ def createHashCheckOverride(
     # run or dont run
     run_analysis = force_run or not os.path.isfile(analysis_file)
 
-    return run_analysis, analysis_file, analysis_info
+    return run_analysis, analysis_file, analysis_info, analysis_id
 
-create_hash_check_override = CustomNode(createHashCheckOverride, outputs=("run_analysis", "analysis_file", "analysis_dict"), description="create unique hash and check for old files")
+create_hash_check_override = CustomNode(createHashCheckOverride, outputs=("run_analysis", "analysis_file", "analysis_dict", "analysis_id"), description="create unique hash and check for old files")
 
 
 ##############################################
@@ -109,7 +121,8 @@ def saveData(
             timeseries_masker.inverse_transform(bold_predictions.T).to_filename(preamble + "desc-predictions_bold.nii.gz")
         # 3D data
         timeseries_masker.inverse_transform(bold_cvr_amplitude).to_filename(preamble + "desc-cvrAmplitude_map.nii.gz")
-        timeseries_masker.inverse_transform(bold_timeshift_maxcorr).to_filename(preamble + "desc-cvrTimeshift_map.nii.gz")
+        # compute cvr timeshift maps relative to global timeshift
+        timeseries_masker.inverse_transform(bold_timeshift_maxcorr - global_regressor_timeshift).to_filename(preamble + "desc-cvrTimeshift_map.nii.gz")
         timeseries_masker.inverse_transform(bold_tsnr).to_filename(preamble + "desc-tsnr_map.nii.gz")
         timeseries_masker.inverse_transform(bold_r_squared).to_filename(preamble + "desc-rSquared_map.nii.gz")
         if full_output:
