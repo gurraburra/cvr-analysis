@@ -121,8 +121,7 @@ def saveData(
             timeseries_masker.inverse_transform(bold_predictions.T).to_filename(preamble + "desc-predictions_bold.nii.gz")
         # 3D data
         timeseries_masker.inverse_transform(bold_cvr_amplitude).to_filename(preamble + "desc-cvrAmplitude_map.nii.gz")
-        # compute cvr timeshift maps relative to global timeshift
-        timeseries_masker.inverse_transform(bold_timeshift_maxcorr - global_regressor_timeshift).to_filename(preamble + "desc-cvrTimeshift_map.nii.gz")
+        timeseries_masker.inverse_transform(bold_timeshift_maxcorr).to_filename(preamble + "desc-cvrTimeshift_map.nii.gz")
         timeseries_masker.inverse_transform(bold_tsnr).to_filename(preamble + "desc-tsnr_map.nii.gz")
         timeseries_masker.inverse_transform(bold_r_squared).to_filename(preamble + "desc-rSquared_map.nii.gz")
         if full_output:

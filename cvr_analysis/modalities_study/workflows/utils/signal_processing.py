@@ -23,15 +23,12 @@ class ResampleTimeSeries(ProcessNode):
     """
     outputs = ("resampled_times","resampled_timeseries") 
 
-    def _run(self, times : np.ndarray, timeseries : np.ndarray, sample_time : float, start_time : float = None, end_time : float = None, padding : float = 0) -> tuple:
+    def _run(self, times : np.ndarray, timeseries : np.ndarray, sample_time : float, start_time : float = None, end_time : float = None) -> tuple:
         # check start/end time
         if start_time is None:
             start_time = np.min(times)
         if end_time is None:
             end_time = np.max(times)
-        # add padding
-        start_time -= padding
-        end_time += padding
 
         t_new = np.arange(start_time, end_time + sample_time, sample_time)
 
@@ -65,7 +62,7 @@ class DetrendTimeSeries(ProcessNode):
             detrend_func = partial(self._endPointDetrend, nr_mean = nr_mean)
         elif detrend_type == "linear":
             # check order is an int between 0 and 3
-            assert isinstance(detrend_order,int) and detrend_order >= 0 and detrend_order <= 3, f"'detrend_order' needs to be an integer between 0-3 when using linear detrending, '{detrend_order}' was given"
+            assert isinstance(detrend_order,int) and detrend_order >= 0, f"'detrend_order' needs to be an integer larger than 0 when using linear detrending, '{detrend_order}' was given"
             detrend_func = partial(self._linearDetrend, detrend_order = detrend_order)
         else:
             raise ValueError("'linear_detrend_type' must either be 'linear' or 'endpoints'")

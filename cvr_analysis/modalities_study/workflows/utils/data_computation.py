@@ -78,16 +78,20 @@ class Correlate(ProcessNode):
         # check std before caculating correlations
         timeseries_a_std = timeseries_a_nan_removed.std()
         timeseries_b_std = timeseries_b_nan_removed.std()
+        # standardize function
+        def stand(ser):
+            return (ser-ser.mean()) / ser.std()
         # if close to zero -> return directly
         if np.isclose(timeseries_a_std, 0) or np.isclose(timeseries_b_std, 0):
             return 0, 0, timeshifts, np.zeros_like(timeshifts)
         else:
             # norm factor
             norm_factor = min(len(timeseries_a_nan_removed), len(timeseries_b_nan_removed))
+            # applying ahmming window (basically because RapidTide suggest so)
+            normalized_windowed_a = stand(sc_signal.get_window("hamming", len(timeseries_a_nan_removed)) * stand(timeseries_a_nan_removed))
+            normalized_windowed_b = stand(sc_signal.get_window("hamming", len(timeseries_b_nan_removed)) * stand(timeseries_b_nan_removed))
             # correlate
-            correlations = sc_signal.correlate(
-                            (timeseries_a_nan_removed - timeseries_a_nan_removed.mean()) / timeseries_a_std, 
-                                (timeseries_b_nan_removed - timeseries_b_nan_removed.mean()) / timeseries_b_std) / norm_factor
+            correlations = sc_signal.correlate(normalized_windowed_a, normalized_windowed_b) / norm_factor
             # add nan values
             correlations = np.concatenate(
                     (

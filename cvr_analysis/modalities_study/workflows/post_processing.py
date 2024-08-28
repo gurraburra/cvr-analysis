@@ -134,8 +134,6 @@ new_sampling_time = NewSampleTime(description="calculate new sample time and ups
 resample_bold_timeseries = ResampleTimeSeries(description="resample bold timeseries")
 resample_confounds_df = ResampleTimeSeries(description="resample confounds df")
 resample_co2_series = ResampleTimeSeries(description="resample co2 series")
-co2_timeseries_padding = ValueNode(0.0)
-zero_timeseries_padding = ValueNode(0.0)
 
 # resample time wf
 resample_wf = ProcessWorkflow(
@@ -150,7 +148,6 @@ resample_wf = ProcessWorkflow(
         (ProcessWorkflow.input.analysis_start_time, resample_bold_timeseries.input.start_time),
         (ProcessWorkflow.input.analysis_end_time, resample_bold_timeseries.input.end_time),
         (new_sampling_time.output.new_sample_time, resample_bold_timeseries.input.sample_time),
-        (zero_timeseries_padding.output.value, resample_bold_timeseries.input.padding),
         (resample_bold_timeseries.output.resampled_times, ProcessWorkflow.output.resampled_bold_times),
         (resample_bold_timeseries.output.resampled_timeseries, ProcessWorkflow.output.resampled_bold_timeseries),
         # resample confounds
@@ -159,7 +156,6 @@ resample_wf = ProcessWorkflow(
         (ProcessWorkflow.input.analysis_start_time, resample_confounds_df.input.start_time),
         (ProcessWorkflow.input.analysis_end_time, resample_confounds_df.input.end_time),
         (new_sampling_time.output.new_sample_time, resample_confounds_df.input.sample_time),
-        (zero_timeseries_padding.output.value, resample_confounds_df.input.padding),
         (resample_confounds_df.output.resampled_times, ProcessWorkflow.output.resampled_confounds_df_times),
         (resample_confounds_df.output.resampled_timeseries, ProcessWorkflow.output.resampled_confounds_df),
         # resample co2 timeseries
@@ -168,7 +164,6 @@ resample_wf = ProcessWorkflow(
         (ProcessWorkflow.input.analysis_start_time, resample_co2_series.input.start_time),
         (ProcessWorkflow.input.analysis_end_time, resample_co2_series.input.end_time),
         (new_sampling_time.output.new_sample_time, resample_co2_series.input.sample_time),
-        (co2_timeseries_padding.output.value, resample_co2_series.input.padding),
         (resample_co2_series.output.resampled_times, ProcessWorkflow.output.resampled_co2_times),
         (resample_co2_series.output.resampled_timeseries, ProcessWorkflow.output.resampled_co2_timeseries),
     ),
