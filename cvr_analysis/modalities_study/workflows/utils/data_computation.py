@@ -124,7 +124,6 @@ class Correlate(ProcessNode):
             idx_before_masking = np.arange(len(mask))[mask][index]
             overlap = min(idx_before_masking + 1, len_a) - max(idx_before_masking - len_b + 1, 0)
             if overlap < 2:
-                print("hej")
                 return 0, 0, timeshifts, np.zeros_like(timeshifts)
             else:
                 # correlation at idx_before_masking
