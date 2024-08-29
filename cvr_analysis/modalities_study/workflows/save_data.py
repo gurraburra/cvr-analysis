@@ -19,9 +19,9 @@ def createHashCheckOverride(
                         output_directory, subject, session, task, run, space,
                                 voxel_mask, roi_masker, spatial_smoothing_fwhm, 
                                     analysis_start_time, analysis_end_time, min_sample_freq, 
-                                        linear_detrend_type, linear_detrend_order, temporal_filter_freq, 
+                                        detrend_type, detrend_linear_order, detrend_endpoint_average, temporal_filter_freq, 
                                             use_co2_regressor, motion_regressor_correlation_threshold,
-                                                maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound,
+                                                maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, correlation_window,
                                                     force_run = False):
     # folder for files
     analysis_name = "cvr-analysis-modalities-0.1rc12"
@@ -41,15 +41,21 @@ def createHashCheckOverride(
         raise ValueError(f"please specify which voxel mask to be used")
     
     # check linear detrend type
-    if linear_detrend_type == "linear":
-        type_linear_order = int
-    elif linear_detrend_type == "endpoints":
-        type_linear_order = float
+    if detrend_type is None:
+        detrend_endpoint_average = None
+        detrend_linear_order = None
+    elif detrend_type == "linear":
+        detrend_endpoint_average = None
+        # check if linear order = None -> set type = None
+        if detrend_linear_order is None:
+            detrend_type = None
+    elif detrend_type == "endpoints":
+        detrend_linear_order = None
+        # check if endpoint average = None -> set type = None
+        if detrend_endpoint_average is None:
+            detrend_type = None
     else:
-        raise ValueError("linear_detrend_type must either be 'linear' or 'endpoints'")
-    # check if linear detrend order = None -> set type = None
-    if linear_detrend_order is None:
-        linear_detrend_type = None
+        raise ValueError("'detrend_type' must either be 'linear', 'endpoints' or 'None'")
    
     # analysis info
     analysis_info = {
@@ -59,13 +65,15 @@ def createHashCheckOverride(
         "spatial-smoothing-fwhm"                    : try_conv(spatial_smoothing_fwhm, float),
         "min-sample-freq"                           : try_conv(min_sample_freq, float),
         "analysis-bounds"                           : try_conv((analysis_start_time, analysis_end_time), float),
-        "linear-detrend-type"                       : try_conv(linear_detrend_type, str),
-        "linear-detrend-order"                      : try_conv(linear_detrend_order, type_linear_order),
+        "detrend_type"                              : try_conv(detrend_type, str),
+        "detrend-linear-order"                      : try_conv(detrend_linear_order, int),
+        "detrend-endpoint-average"                  : try_conv(detrend_endpoint_average, float),
         "temporal-filter-freq"                      : try_conv(temporal_filter_freq, float),
         "use-co2-regressor"                         : bool(use_co2_regressor),
         "motion-regressor-correlation-threshold"    : try_conv(motion_regressor_correlation_threshold, float),
         "align-regressor-bounds"                    : try_conv((align_regressor_lower_bound, align_regressor_upper_bound), float),
         "maxcorr-bipolar"                           : bool(maxcorr_bipolar),
+        "correlation-window"                        : try_conv(correlation_window, str),
     }
 
     # analysis id

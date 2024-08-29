@@ -52,20 +52,24 @@ class DetrendTimeSeries(ProcessNode):
     """
     outputs = ("detrended_timeseries", )
 
-    def _run(self, timeseries : np.ndarray, sample_time : float, detrend_order : int = 1, detrend_type : str = "linear") -> tuple:
-        # check detrend order
-        if detrend_order is None:
-            return timeseries, 
+    def _run(self, timeseries : np.ndarray, sample_time : float, detrend_type : str = "linear", linear_order : int = 1, endpoint_average : float = 10) -> tuple:
+        # check detrend type
+        if detrend_type is None:
+            return timeseries,
         elif detrend_type == "endpoints":
-            # interpret detrend order as time in seconds to average
-            nr_mean = max(int(detrend_order / sample_time), 1)
-            detrend_func = partial(self._endPointDetrend, nr_mean = nr_mean)
+            # check endpoints average order
+            if endpoint_average is None:
+                return timeseries, 
+            # convert to indexes to average
+            idx_mean = max(int(endpoint_average / sample_time), 1)
+            detrend_func = partial(self._endPointDetrend, idx_mean = idx_mean)
         elif detrend_type == "linear":
-            # check order is an int between 0 and 3
-            assert isinstance(detrend_order,int) and detrend_order >= 0, f"'detrend_order' needs to be an integer larger than 0 when using linear detrending, '{detrend_order}' was given"
-            detrend_func = partial(self._linearDetrend, detrend_order = detrend_order)
+            # check linear order 
+            if linear_order is None:
+                return timeseries, 
+            detrend_func = partial(self._linearDetrend, linear_order = linear_order)
         else:
-            raise ValueError("'linear_detrend_type' must either be 'linear' or 'endpoints'")
+            raise ValueError("'detrend_type' must either be 'linear' or 'endpoints'")
         # check timeseries type
         if isinstance(timeseries, np.ndarray) and (timeseries.ndim == 1 or timeseries.ndim == 2):
             if timeseries.ndim == 2:
@@ -80,18 +84,18 @@ class DetrendTimeSeries(ProcessNode):
 
         return detrended_timeseries, 
 
-    def _endPointDetrend(self, timeseries, nr_mean):
+    def _endPointDetrend(self, timeseries, idx_mean):
         # get length
         l = timeseries.shape[0]
         # get diff between endpoitns
-        end_point_diff = timeseries[-nr_mean:].mean(axis = 0) - timeseries[:nr_mean].mean(axis = 0)
+        end_point_diff = timeseries[-idx_mean:].mean(axis = 0) - timeseries[:idx_mean].mean(axis = 0)
         # create trend
-        end_points_trend = np.arange(l)[:,None] * ( end_point_diff / (l - nr_mean))[None,:] - (end_point_diff * (l - 1) / (l - nr_mean) / 2) 
+        end_points_trend = np.arange(l)[:,None] * ( end_point_diff / (l - idx_mean))[None,:] - (end_point_diff * (l - 1) / (l - idx_mean) / 2) 
         return timeseries - end_points_trend
     
-    def _linearDetrend(self, timeseries, detrend_order):
+    def _linearDetrend(self, timeseries, linear_order):
         # create linear confounds
-        linear_trends = glm.first_level.make_first_level_design_matrix(np.arange(timeseries.shape[0]), drift_model = "polynomial", drift_order = detrend_order).drop(columns="constant")
+        linear_trends = glm.first_level.make_first_level_design_matrix(np.arange(timeseries.shape[0]), drift_model = "polynomial", drift_order = linear_order).drop(columns="constant")
         return signal.clean(timeseries, confounds=linear_trends, detrend=False, standardize=False)
 
 class TemporalFilterTimeSeries(ProcessNode):

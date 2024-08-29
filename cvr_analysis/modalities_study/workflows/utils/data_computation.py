@@ -36,7 +36,7 @@ class Correlate(ProcessNode):
     to the right, i.e leads timeseries_a.
     """
     outputs = ("timeshift_maxcorr", "maxcorr", "timeshifts", "correlations")
-    def _run(self, timeseries_a : np.ndarray, timeseries_b : np.ndarray, time_step : float, lower_limit : int = None, upper_limit : int = None, bipolar : bool = True) -> tuple:
+    def _run(self, timeseries_a : np.ndarray, timeseries_b : np.ndarray, time_step : float, lower_limit : int = None, upper_limit : int = None, bipolar : bool = True, window : str = None) -> tuple:
         # handle leading and trailing nan values
         # series a
         timeseries_a_nan = np.isnan(timeseries_a)
@@ -85,13 +85,23 @@ class Correlate(ProcessNode):
         if np.isclose(timeseries_a_std, 0) or np.isclose(timeseries_b_std, 0):
             return 0, 0, timeshifts, np.zeros_like(timeshifts)
         else:
-            # norm factor
-            norm_factor = min(len(timeseries_a_nan_removed), len(timeseries_b_nan_removed))
+            # standardized timeseries
+            stand_a = stand(timeseries_a_nan_removed)
+            stand_b = stand(timeseries_b_nan_removed)
+            len_a = len(stand_a)
+            len_b = len(stand_b)
+            # check window
+            if window is None:
+                window_a = np.ones(len_a)
+                window_b = np.ones(len_b)
+            else:
+                window_a = sc_signal.get_window(window, len_a)
+                window_b = sc_signal.get_window(window, len_b)
             # applying ahmming window (basically because RapidTide suggest so)
-            normalized_windowed_a = stand(sc_signal.get_window("hamming", len(timeseries_a_nan_removed)) * stand(timeseries_a_nan_removed))
-            normalized_windowed_b = stand(sc_signal.get_window("hamming", len(timeseries_b_nan_removed)) * stand(timeseries_b_nan_removed))
+            stand_a *= window_a
+            stand_b *= window_b
             # correlate
-            correlations = sc_signal.correlate(normalized_windowed_a, normalized_windowed_b) / norm_factor
+            correlations = sc_signal.correlate(stand_a, stand_b) / min(len_a, len_b)
             # add nan values
             correlations = np.concatenate(
                     (
@@ -103,14 +113,17 @@ class Correlate(ProcessNode):
             # bound correlations and timeshifts
             correlations = correlations[mask]
             
+            # find max
+            if bipolar:
+                index = np.nanargmax(np.abs(correlations))
+            else:
+                index = np.nanargmax(correlations)
+
+            # correlation at index
+            # corr = np.sum(stand_a[max(index - len_b + 1, 0): min(index + 1, len_a)] * stand_b[max(len_b - index - 1, 0) : min(len_a + len_b - index - 1, len_b)]) / min(len_a, len_b)
             
-        # find max
-        if bipolar:
-            index = np.nanargmax(np.abs(correlations))
-        else:
-            index = np.nanargmax(correlations)
-            
-        return timeshifts[index], correlations[index], timeshifts, correlations
+                
+            return timeshifts[index], correlations[index], timeshifts, correlations
         
 
 class AlignTimeSeries(ProcessNode):

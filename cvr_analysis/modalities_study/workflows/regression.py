@@ -120,6 +120,7 @@ get_regression_confounds_wf = ProcessWorkflow(
         (load_motion_confounds.output.motion_confounds_df.columns, ProcessWorkflow.output.motion_confound_names),
         # motion regressor maxcorr
         (ProcessWorkflow.input.regressor_timeseries, motion_regressor_maxcorr.input.timeseries_b),
+        (ProcessWorkflow.input.correlation_window, motion_regressor_maxcorr.input.window),
         (load_motion_confounds.output.motion_confounds_df.to_numpy().T, motion_regressor_maxcorr.input.motionIter_timeseries_a),
         (ValueNode(1).output.value, motion_regressor_maxcorr.input.time_step),
         (ValueNode(None).output.value, motion_regressor_maxcorr.input.lower_limit),
@@ -165,6 +166,7 @@ correlate_align_downsample_wf = ProcessWorkflow(
         (ProcessWorkflow.input.align_regressor_lower_bound, correlate_bold_regressor_timeseries.input.lower_limit),
         (ProcessWorkflow.input.align_regressor_upper_bound, correlate_bold_regressor_timeseries.input.upper_limit),
         (ProcessWorkflow.input.maxcorr_bipolar, correlate_bold_regressor_timeseries.input.bipolar),
+        (ProcessWorkflow.input.correlation_window, correlate_bold_regressor_timeseries.input.window),
         (correlate_bold_regressor_timeseries.output.all, ProcessWorkflow.output._),
         # align regressor
         (ProcessWorkflow.input.regressor_timeseries, align_regressor_timeseries.input.timeseries),
@@ -218,6 +220,7 @@ global_co2_regression_wf = ProcessWorkflow(
         (ProcessWorkflow.input._, correlate_align_downsample_wf.input[("sample_time", "down_sampling_factor")]),
         (ProcessWorkflow.input.co2_timeseries, correlate_align_downsample_wf.input.regressor_timeseries),
         (ProcessWorkflow.input.global_timeseries, correlate_align_downsample_wf.input.bold_ts),
+        (ProcessWorkflow.input.correlation_window, correlate_align_downsample_wf.input.correlation_window),
         (ValueNode(False).output.value, correlate_align_downsample_wf.input.maxcorr_bipolar),
         (ValueNode(None).output.value, correlate_align_downsample_wf.input.align_regressor_lower_bound),
         (ValueNode(None).output.value, correlate_align_downsample_wf.input.align_regressor_upper_bound),
@@ -269,12 +272,13 @@ setup_regression_wf = ProcessWorkflow(
         (ProcessWorkflow.input.confounds_df, get_regression_confounds_wf.input.confounds_df),
         (ProcessWorkflow.input.motion_regressor_correlation_threshold, get_regression_confounds_wf.input.motion_regressor_correlation_threshold),
         (ProcessWorkflow.input.down_sampling_factor, get_regression_confounds_wf.input.down_sampling_factor),
+        (ProcessWorkflow.input.correlation_window, get_regression_confounds_wf.input.correlation_window),
         (choose_regressor.output.timeseries, get_regression_confounds_wf.input.regressor_timeseries),
         (ValueNode(True).output.value, get_regression_confounds_wf.input.motion_derivatives),
         (ValueNode(True).output.value, get_regression_confounds_wf.input.motion_powers),
         (get_regression_confounds_wf.output.all, ProcessWorkflow.output._),
         # global regressor beta
-        (ProcessWorkflow.input._, global_co2_regression_wf.input[("sample_time", "down_sampling_factor")]),
+        (ProcessWorkflow.input._, global_co2_regression_wf.input[("sample_time", "down_sampling_factor", "correlation_window")]),
         (prepare_regressors.output.co2_timeseries, global_co2_regression_wf.input.co2_timeseries),
         (prepare_regressors.output.co2_baseline, global_co2_regression_wf.input.co2_baseline),
         (prepare_regressors.output.normed_global_timeseries, global_co2_regression_wf.input.global_timeseries),
@@ -330,6 +334,7 @@ iterative_regression_wf = ProcessWorkflow(
         (ProcessWorkflow.input.align_regressor_absolute_lower_bound, iterate_correlate_align_downsample_wf.input.align_regressor_lower_bound),
         (ProcessWorkflow.input.align_regressor_absolute_upper_bound, iterate_correlate_align_downsample_wf.input.align_regressor_upper_bound),
         (ProcessWorkflow.input.maxcorr_bipolar, iterate_correlate_align_downsample_wf.input.maxcorr_bipolar),
+        (ProcessWorkflow.input.correlation_window, iterate_correlate_align_downsample_wf.input.correlation_window),
         (iterate_correlate_align_downsample_wf.output.all, ProcessWorkflow.output._),
         # iterate calculate cvr
         (ProcessWorkflow.input.down_sampled_regression_confounds_df, iterate_calculate_cvr.input.down_sampled_confounds_df),
@@ -349,7 +354,7 @@ regression_wf = ProcessWorkflow(
         (ProcessWorkflow.input._, setup_regression_wf.input.all),
         (setup_regression_wf.output.all, ProcessWorkflow.output._),
         # iterative regression
-        (ProcessWorkflow.input._, iterative_regression_wf.input[("bold_timeseries", "sample_time", "down_sampling_factor", "maxcorr_bipolar")]),
+        (ProcessWorkflow.input._, iterative_regression_wf.input[("bold_timeseries", "sample_time", "down_sampling_factor", "maxcorr_bipolar", "correlation_window")]),
         (setup_regression_wf.output.regressor_timeseries, iterative_regression_wf.input.regressor_timeseries),
         (setup_regression_wf.output.regressor_baseline, iterative_regression_wf.input.regressor_baseline),
         (setup_regression_wf.output.align_regressor_absolute_lower_bound, iterative_regression_wf.input.align_regressor_absolute_lower_bound),
