@@ -65,9 +65,9 @@ class DetrendTimeSeries(ProcessNode):
             detrend_func = partial(self._endPointDetrend, idx_mean = idx_mean)
         elif detrend_type == "linear":
             # check linear order 
-            if linear_order is None:
+            if linear_order is None or int(linear_order) == 0:
                 return timeseries, 
-            detrend_func = partial(self._linearDetrend, linear_order = linear_order)
+            detrend_func = partial(self._linearDetrend, linear_order = int(linear_order))
         else:
             raise ValueError("'detrend_type' must either be 'linear' or 'endpoints'")
         # check timeseries type

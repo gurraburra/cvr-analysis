@@ -47,8 +47,9 @@ def createHashCheckOverride(
     elif detrend_type == "linear":
         detrend_endpoint_average = None
         # check if linear order = None -> set type = None
-        if detrend_linear_order is None:
+        if detrend_linear_order is None or int(detrend_linear_order) == 0:
             detrend_type = None
+            detrend_linear_order = None
     elif detrend_type == "endpoints":
         detrend_linear_order = None
         # check if endpoint average = None -> set type = None
