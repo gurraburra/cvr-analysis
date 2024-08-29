@@ -105,24 +105,21 @@ class IMGShow:
 def stand(sig):
     return (sig - np.nanmean(sig, axis = -1)[..., np.newaxis]) / np.nanstd(sig, axis = -1)[..., np.newaxis]
 
-def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', interpolate = False, **custom_settings):
+def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', **custom_settings):
     # settings
-    settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower"}
+    settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower", 'interpolation' : 'antialiased'}
     settings.update(custom_settings)
     # folder preamble
     folder, analys_file = os.path.split(analysis_file)
     preamble = analys_file.split("_desc-analys_info")[0]
     # cvr file
     cvr_img = image.load_img(os.path.join(folder, preamble + f"_desc-{img_desc}_map.nii.gz"))
-    # mask
-    cvr_mask = np.abs(cvr_img.get_fdata()) < 1e-10
     # cvr data
-    if interpolate != False:
-        cvr_data = spline_filter(cvr_img.get_fdata(), order=interpolate)
-    else:
-        cvr_data = cvr_img.get_fdata()
+    cvr_data = cvr_img.get_fdata()
+    # mask
+    cvr_mask = np.abs(cvr_data) < 1e-10
     # mask data
-    cvr_img_masked = np.ma.masked_where(cvr_mask, cvr_data)
+    cvr_img_masked = cvr_data#np.ma.masked_where(cvr_mask, cvr_data)
     # data
     data = []
     # get bold data
