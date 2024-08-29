@@ -2,9 +2,9 @@ import os
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from nilearn import image
-import json
 import numpy as np
 import sys
+from scipy.ndimage import spline_filter
 
 class IMGShow:
     def __init__(self, img, settings, *plot_data):
@@ -23,14 +23,17 @@ class IMGShow:
         self.plot_data = plot_data
         # connect mpl
         self.fig.canvas.mpl_connect("button_press_event", self.buttonClick)
+        # colormap
+        self.settings["norm"] = mpl.colors.TwoSlopeNorm(vcenter = self.settings["vcenter"], vmin = self.settings["vmin"], vmax = self.settings["vmax"])
+        del self.settings["vcenter"]
+        del self.settings["vmin"]
+        del self.settings["vmax"]
+        self.scal_map = mpl.cm.ScalarMappable(norm=self.settings["norm"], cmap=self.settings["cmap"])
+        # self.fig.set_facecolor("black")
+        self.createColorbar()
         # set default position
         self.pos = [20,30,20]
         self.update()
-        # colormap
-        norm = mpl.colors.Normalize(vmin = self.settings["vmin"], vmax = self.settings["vmax"])
-        self.scal_map = mpl.cm.ScalarMappable(norm=norm, cmap=self.settings["cmap"])
-        # self.fig.set_facecolor("black")
-        self.createColorbar()
 
     def update(self):
         for ax in self.axes.ravel():
@@ -102,17 +105,24 @@ class IMGShow:
 def stand(sig):
     return (sig - np.nanmean(sig, axis = -1)[..., np.newaxis]) / np.nanstd(sig, axis = -1)[..., np.newaxis]
 
-def showCVRAnalysisResult(analysis_file : str, vmin = -1, vmax = 1):
+def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', interpolate = False, **custom_settings):
     # settings
-    settings = {"cmap" : "RdYlBu_r", "vmin" : vmin, "vmax" : vmax, "aspect" : "equal", "origin" : "lower"}
+    settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower"}
+    settings.update(custom_settings)
     # folder preamble
     folder, analys_file = os.path.split(analysis_file)
     preamble = analys_file.split("_desc-analys_info")[0]
     # cvr file
-    cvr_img = image.load_img(os.path.join(folder, preamble + "_desc-cvrAmplitude_map.nii.gz"))
-    # mask cvr file
+    cvr_img = image.load_img(os.path.join(folder, preamble + f"_desc-{img_desc}_map.nii.gz"))
+    # mask
     cvr_mask = np.abs(cvr_img.get_fdata()) < 1e-10
-    cvr_img_masked = np.ma.masked_where(cvr_mask, cvr_img.get_fdata())
+    # cvr data
+    if interpolate != False:
+        cvr_data = spline_filter(cvr_img.get_fdata(), order=interpolate)
+    else:
+        cvr_data = cvr_img.get_fdata()
+    # mask data
+    cvr_img_masked = np.ma.masked_where(cvr_mask, cvr_data)
     # data
     data = []
     # get bold data
