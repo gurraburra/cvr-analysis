@@ -5,6 +5,7 @@ from sklearn.cluster import KMeans
 import sklearn.linear_model as lm
 from sklearn.metrics import r2_score
 import scipy.signal as sc_signal
+from scipy.stats import pearsonr
 
 
 class BaselinePlateau(ProcessNode):
@@ -98,10 +99,10 @@ class Correlate(ProcessNode):
                 window_a = sc_signal.get_window(window, len_a)
                 window_b = sc_signal.get_window(window, len_b)
             # applying ahmming window (basically because RapidTide suggest so)
-            stand_a *= window_a
-            stand_b *= window_b
+            windowed_stand_a = stand_a * window_a
+            windowed_stand_b = stand_b * window_b
             # correlate
-            correlations = sc_signal.correlate(stand_a, stand_b) / min(len_a, len_b)
+            correlations = sc_signal.correlate(windowed_stand_a, windowed_stand_b)
             # add nan values
             correlations = np.concatenate(
                     (
@@ -119,11 +120,19 @@ class Correlate(ProcessNode):
             else:
                 index = np.nanargmax(correlations)
 
-            # correlation at index
-            # corr = np.sum(stand_a[max(index - len_b + 1, 0): min(index + 1, len_a)] * stand_b[max(len_b - index - 1, 0) : min(len_a + len_b - index - 1, len_b)]) / min(len_a, len_b)
-            
-                
-            return timeshifts[index], correlations[index], timeshifts, correlations
+            # check overlap
+            idx_before_masking = np.arange(len(mask))[mask][index]
+            overlap = min(idx_before_masking + 1, len_a) - max(idx_before_masking - len_b + 1, 0)
+            if overlap < 2:
+                print("hej")
+                return 0, 0, timeshifts, np.zeros_like(timeshifts)
+            else:
+                # correlation at idx_before_masking
+                corr_at_index = pearsonr(stand_a[max(idx_before_masking - len_b + 1, 0): min(idx_before_masking + 1, len_a)], stand_b[max(len_b - idx_before_masking - 1, 0) : min(len_a + len_b - idx_before_masking - 1, len_b)]).statistic
+                # correct correlation using correlation at index (otherwise windowing will lead to incorrect estimate)
+                correlations *= np.abs(corr_at_index / correlations[index])
+                    
+                return timeshifts[index], correlations[index], timeshifts, correlations
         
 
 class AlignTimeSeries(ProcessNode):

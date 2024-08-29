@@ -103,8 +103,8 @@ def saveData(
                         up_sampling_factor, up_sampled_sample_time,
                             # global co2 data
                             motion_confound_names, motion_regressor_maxcorr, regression_confounds_df,
-                                global_preproc_timeseries, global_baseline, global_plateau, global_std,
-                                    global_aligned_co2_timeseries, co2_baseline, co2_plateau, co2_std,
+                                global_preproc_timeseries, global_baseline, global_plateau, global_std, global_autocorrelation_timeshifts, global_autocorrelation_correlations, 
+                                    global_aligned_co2_timeseries, co2_baseline, co2_plateau, co2_std, co2_autocorrelation_timeshifts, co2_autocorrelation_correlations, 
                                         global_co2_timeshift_maxcorr, global_co2_maxcorr, global_co2_timeshifts, global_co2_correlations, 
                                             global_co2_beta,
                                                 # bold alignement data
@@ -113,7 +113,7 @@ def saveData(
                                                         bold_aligned_regressor_timeseries,
                                                             # bold regression data
                                                             bold_dof, bold_nr_predictors, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_tsnr, 
-                                                                bold_cvr_amplitude,
+                                                                bold_cvr_amplitude, regression_down_sampled_sample_time,
                                                                     # full output
                                                                     full_output = False) -> tuple:
         
@@ -138,10 +138,25 @@ def saveData(
             timeseries_masker.inverse_transform(bold_dof.astype(np.int32)).to_filename(preamble + "desc-dof_map.nii.gz")
             timeseries_masker.inverse_transform(bold_nr_predictors.astype(np.int32)).to_filename(preamble + "desc-nrPredictors_map.nii.gz")
             timeseries_masker.inverse_transform(bold_adjusted_r_squared).to_filename(preamble + "desc-rSquaredAdjusted_map.nii.gz")            
-        # 2D data
+        # 1D data
         if full_output:
+            def saveTimeseriesInfo(name, start_time, time_step):
+                dict_ = {"start-time" : start_time, "time-step" : time_step}
+                with open(name, "w") as file:
+                    json.dump(dict_, file, indent='\t')
+            # global co2
+            saveTimeseriesInfo(preamble + "desc-globalAlignedCO2Series_timeseries.json", 0, regression_down_sampled_sample_time)
             pd.DataFrame(np.vstack((global_preproc_timeseries, global_aligned_co2_timeseries)).T, columns=["global_series", "aligned_co2_series"]).to_csv(preamble + "desc-globalAlignedCO2Series_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
-            pd.DataFrame(np.vstack((global_co2_timeshifts, global_co2_correlations)).T, columns=["timeshifts", "correlations"]).to_csv(preamble + "desc-globalCO2Correlations_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
+            # global co2 correlations
+            saveTimeseriesInfo(preamble + "desc-globalCO2Correlations_timeseries.json", global_co2_timeshifts[0], global_co2_timeshifts[1] - global_co2_timeshifts[0])
+            pd.Series(global_co2_correlations).to_csv(preamble + "desc-globalCO2Correlations_timeseries.tsv.gz", sep="\t", index = False, header=False, compression="gzip")
+            # global autocorrelation
+            saveTimeseriesInfo(preamble + "desc-globalAutocorrelations_timeseries.json", global_autocorrelation_timeshifts[0], global_autocorrelation_timeshifts[1] - global_autocorrelation_timeshifts[0])
+            pd.Series(global_autocorrelation_correlations).to_csv(preamble + "desc-globalAutocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+            # co2 autocorrelation
+            saveTimeseriesInfo(preamble + "desc-co2Autocorrelations_timeseries.json", co2_autocorrelation_timeshifts[0], co2_autocorrelation_timeshifts[1] - co2_autocorrelation_timeshifts[0])
+            pd.Series(co2_autocorrelation_correlations).to_csv(preamble + "desc-co2Autocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+            # motion confounds regressor maxcorr
             pd.DataFrame({"motion_confound" : motion_confound_names, "regressor_maxcorr" : motion_regressor_maxcorr}).to_csv(preamble + "desc-maxcorrMotionRegressor_corr.tsv.gz", sep="\t", index = False, compression="gzip")
         # pd.Series(bold_timeshifts, name="timeshifts").to_csv(preamble + "desc-boldTimeshifts_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
         if full_output:

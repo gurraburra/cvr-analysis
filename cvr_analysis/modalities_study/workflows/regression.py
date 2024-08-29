@@ -14,7 +14,7 @@ from cvr_analysis.modalities_study.workflows.utils.confounds import MotionConfou
 ##########################################################################################################################################
 
 ############################################################################################
-# regression setup
+# setup regression wf
 ############################################################################################
 
 ##############################################
@@ -22,20 +22,41 @@ from cvr_analysis.modalities_study.workflows.utils.confounds import MotionConfou
 ##############################################
 norm_global_timeseries = NormTimeSeries(description="norm global timeseries")
 compute_baseline_plateau_co2_timeseries = BaselinePlateau(description="compute baseline and plateau for co2 timeseries")
-prepare_regressors = ProcessWorkflow(
+
+# autocorrelation
+global_autocorrelation = Correlate(description="global timeseries autocorrelation")
+co2_autocorrelation = Correlate(description="co2 timeseries autocorrelation")
+
+prepare_regressors_wf = ProcessWorkflow(
     (
-        # global regressor
+        # norm global regressor baseline plateau
         (ProcessWorkflow.input.bold_timeseries.mean(axis = 1), norm_global_timeseries.input.timeseries),
         (norm_global_timeseries.output.normed_timeseries, ProcessWorkflow.output.normed_global_timeseries),
         (norm_global_timeseries.output.normed_baseline, ProcessWorkflow.output.normed_global_baseline),
         (norm_global_timeseries.output.normed_plateau, ProcessWorkflow.output.normed_global_plateau),
         (ProcessWorkflow.input.bold_timeseries.mean(axis = 1).std(), ProcessWorkflow.output.normed_global_std),
-        # co2 regressor
+        # global autocorrelation
+        (ProcessWorkflow.input.correlation_window, global_autocorrelation.input.window),
+        (ProcessWorkflow.input.sample_time, global_autocorrelation.input.time_step),
+        (norm_global_timeseries.output.normed_timeseries, global_autocorrelation.input[("timeseries_a", "timeseries_b")]),
+        (ValueNode(None).output.value, global_autocorrelation.input[("lower_limit", "upper_limit")]),
+        (ValueNode(True).output.value, global_autocorrelation.input.bipolar),
+        (global_autocorrelation.output.timeshifts, ProcessWorkflow.output.global_autocorrelation_timeshifts),
+        (global_autocorrelation.output.correlations, ProcessWorkflow.output.global_autocorrelation_correlations),
+        # co2 regressor baseline plateau
         (ProcessWorkflow.input.co2_timeseries, compute_baseline_plateau_co2_timeseries.input.timeseries),
         (ProcessWorkflow.input.co2_timeseries, ProcessWorkflow.output.co2_timeseries),
         (compute_baseline_plateau_co2_timeseries.output.baseline, ProcessWorkflow.output.co2_baseline),
         (compute_baseline_plateau_co2_timeseries.output.plateau, ProcessWorkflow.output.co2_plateau),
         (ProcessWorkflow.input.co2_timeseries.std(), ProcessWorkflow.output.co2_std),
+        # co2 autocorrelation
+        (ProcessWorkflow.input.correlation_window, co2_autocorrelation.input.window),
+        (ProcessWorkflow.input.sample_time, co2_autocorrelation.input.time_step),
+        (ProcessWorkflow.input.co2_timeseries, co2_autocorrelation.input[("timeseries_a", "timeseries_b")]),
+        (ValueNode(None).output.value, co2_autocorrelation.input[("lower_limit", "upper_limit")]),
+        (ValueNode(True).output.value, co2_autocorrelation.input.bipolar),
+        (co2_autocorrelation.output.timeshifts, ProcessWorkflow.output.co2_autocorrelation_timeshifts),
+        (co2_autocorrelation.output.correlations, ProcessWorkflow.output.co2_autocorrelation_correlations),
     ),
     description="prepare potential regressor and compute characterstics"
 )
@@ -63,33 +84,10 @@ dummy_input_mapping = {
                 }
 choose_regressor = ConditionalNode("use_co2_regressor", {True : co2_dummy, False : global_dummy}, default_condition=True, input_mapping = dummy_input_mapping, description="choose regressor")
 
-get_regressor_wf = ProcessWorkflow(
-    (
-        # global timeseries: norm and compute baseline, plateau and std
-        (ProcessWorkflow.input.bold_timeseries.mean(axis = 1), norm_global_timeseries.input.timeseries),
-        (norm_global_timeseries.output.normed_timeseries, ProcessWorkflow.output.normed_global_timeseries),
-        (norm_global_timeseries.output.normed_baseline, ProcessWorkflow.output.normed_global_baseline),
-        (norm_global_timeseries.output.normed_plateau, ProcessWorkflow.output.normed_global_plateau),
-        (norm_global_timeseries.output.normed_timeseries.std(), ProcessWorkflow.output.normed_global_std),
-        # global timeseries: norm and compute baseline, plateau and std
-        (ProcessWorkflow.input.co2_timeseries, compute_baseline_plateau_co2_timeseries.input.timeseries),
-        (compute_baseline_plateau_co2_timeseries.output.baseline, ProcessWorkflow.output.co2_baseline),
-        (compute_baseline_plateau_co2_timeseries.output.plateau, ProcessWorkflow.output.co2_plateau),
-        (ProcessWorkflow.input.co2_timeseries.std(), ProcessWorkflow.output.co2_std),
-        # chhose regressor
-        (ProcessWorkflow.input.use_co2_regressor, choose_regressor.input.use_co2_regressor),
-        (ProcessWorkflow.input.co2_timeseries, choose_regressor.input.co2_timeseries),
-        (compute_baseline_plateau_co2_timeseries.output.baseline, choose_regressor.input.co2_baseline),
-        (compute_baseline_plateau_co2_timeseries.output.plateau, choose_regressor.input.co2_plateau),
-        (norm_global_timeseries.output.normed_timeseries, choose_regressor.input.global_timeseries),
-        (norm_global_timeseries.output.normed_baseline, choose_regressor.input.global_baseline),
-        (norm_global_timeseries.output.normed_plateau, choose_regressor.input.global_plateau),
-        (choose_regressor.output.timeseries, ProcessWorkflow.output.regressor_timeseries),
-        (choose_regressor.output.baseline, ProcessWorkflow.output.regressor_baseline),
-        (choose_regressor.output.plateau, ProcessWorkflow.output.regressor_plateau),
-    ),
-    "Get regressor workflow"
-)
+##############################################
+# regressor autocorrelation
+##############################################
+
 
 # %%
 ##############################################
@@ -254,21 +252,21 @@ add_none_upper = add_none_lower.copy()
 # %%
 setup_regression_wf = ProcessWorkflow(
     (
-        # regressor characterstics
-        (ProcessWorkflow.input._, prepare_regressors.input.all),
-        (prepare_regressors.output.all, ProcessWorkflow.output._),
+        # prepare regressor wf
+        (ProcessWorkflow.input._, prepare_regressors_wf.input.all),
+        (prepare_regressors_wf.output.all, ProcessWorkflow.output._),
         # choose regressor
         (ProcessWorkflow.input._, choose_regressor.input.use_co2_regressor),
-        (prepare_regressors.output.co2_timeseries, choose_regressor.input.co2_timeseries),
-        (prepare_regressors.output.co2_baseline, choose_regressor.input.co2_baseline),
-        (prepare_regressors.output.co2_plateau, choose_regressor.input.co2_plateau),
-        (prepare_regressors.output.normed_global_timeseries, choose_regressor.input.global_timeseries),
-        (prepare_regressors.output.normed_global_baseline, choose_regressor.input.global_baseline),
-        (prepare_regressors.output.normed_global_plateau, choose_regressor.input.global_plateau),
+        (prepare_regressors_wf.output.co2_timeseries, choose_regressor.input.co2_timeseries),
+        (prepare_regressors_wf.output.co2_baseline, choose_regressor.input.co2_baseline),
+        (prepare_regressors_wf.output.co2_plateau, choose_regressor.input.co2_plateau),
+        (prepare_regressors_wf.output.normed_global_timeseries, choose_regressor.input.global_timeseries),
+        (prepare_regressors_wf.output.normed_global_baseline, choose_regressor.input.global_baseline),
+        (prepare_regressors_wf.output.normed_global_plateau, choose_regressor.input.global_plateau),
         (choose_regressor.output.timeseries, ProcessWorkflow.output.regressor_timeseries),
         (choose_regressor.output.baseline, ProcessWorkflow.output.regressor_baseline),
         (choose_regressor.output.plateau, ProcessWorkflow.output.regressor_plateau),
-        # confounds
+        # get regression confounds wf
         (ProcessWorkflow.input.confounds_df, get_regression_confounds_wf.input.confounds_df),
         (ProcessWorkflow.input.motion_regressor_correlation_threshold, get_regression_confounds_wf.input.motion_regressor_correlation_threshold),
         (ProcessWorkflow.input.down_sampling_factor, get_regression_confounds_wf.input.down_sampling_factor),
@@ -279,9 +277,9 @@ setup_regression_wf = ProcessWorkflow(
         (get_regression_confounds_wf.output.all, ProcessWorkflow.output._),
         # global regressor beta
         (ProcessWorkflow.input._, global_co2_regression_wf.input[("sample_time", "down_sampling_factor", "correlation_window")]),
-        (prepare_regressors.output.co2_timeseries, global_co2_regression_wf.input.co2_timeseries),
-        (prepare_regressors.output.co2_baseline, global_co2_regression_wf.input.co2_baseline),
-        (prepare_regressors.output.normed_global_timeseries, global_co2_regression_wf.input.global_timeseries),
+        (prepare_regressors_wf.output.co2_timeseries, global_co2_regression_wf.input.co2_timeseries),
+        (prepare_regressors_wf.output.co2_baseline, global_co2_regression_wf.input.co2_baseline),
+        (prepare_regressors_wf.output.normed_global_timeseries, global_co2_regression_wf.input.global_timeseries),
         (get_regression_confounds_wf.output.down_sampled_regression_confounds_df, global_co2_regression_wf.input.down_sampled_regression_confounds_df),
         (global_co2_regression_wf.output.timeshift_maxcorr, ProcessWorkflow.output.global_co2_timeshift_maxcorr),
         (global_co2_regression_wf.output.maxcorr, ProcessWorkflow.output.global_co2_maxcorr),
@@ -362,7 +360,7 @@ regression_wf = ProcessWorkflow(
         (setup_regression_wf.output.down_sampled_regression_confounds_df, iterative_regression_wf.input.down_sampled_regression_confounds_df),
         (iterative_regression_wf.output.all, ProcessWorkflow.output._),
         # compute down sampled sample time
-        (ProcessWorkflow.input.sample_time / ProcessWorkflow.input.down_sampling_factor, ProcessWorkflow.output.down_sampled_sample_time)
+        (ProcessWorkflow.input.sample_time * ProcessWorkflow.input.down_sampling_factor, ProcessWorkflow.output.down_sampled_sample_time)
     ),
     description="regression wf"
 )
