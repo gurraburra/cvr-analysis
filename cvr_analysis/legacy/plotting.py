@@ -5,9 +5,10 @@ from nilearn import image
 import numpy as np
 import sys
 from scipy.ndimage import spline_filter
+import json
 
 class IMGShow:
-    def __init__(self, img, settings, *plot_data):
+    def __init__(self, img, voxel_mask, settings, *plot_data):
         # initate figure
         self.fig, self.axes = plt.subplots(2,2, figsize=(7,7))
         self.fig.tight_layout()
@@ -19,6 +20,7 @@ class IMGShow:
         self.plot_ax = self.axes[1,1]
         # store data
         self.img = img
+        self.voxel_mask = voxel_mask
         self.settings = settings
         self.plot_data = plot_data
         # connect mpl
@@ -50,6 +52,11 @@ class IMGShow:
         self.axial_ax.imshow(self.img[:,:,self.pos[2]].T, **self.settings)
         self.axial_ax.axvline(self.pos[0], color = "black", alpha = 0.5)
         self.axial_ax.axhline(self.pos[1], color = "black", alpha = 0.5)
+        # voxel mask
+        if self.voxel_mask is not None:
+            self.sagittal_ax.imshow(self.voxel_mask[self.pos[0],:,:].T, cmap = 'Greys', aspect = self.settings["aspect"], origin = self.settings["origin"], interpolation = 'nearest')
+            self.coronal_ax.imshow(self.voxel_mask[:,self.pos[1],:].T, cmap = 'Greys', aspect = self.settings["aspect"], origin = self.settings["origin"], interpolation = 'nearest')
+            self.axial_ax.imshow(self.voxel_mask[:,:,self.pos[2]].T, cmap = 'Greys', aspect = self.settings["aspect"], origin = self.settings["origin"], interpolation = 'nearest')
         # plot ax
         for data, label in self.plot_data:
             if data.ndim == 1:
@@ -119,7 +126,7 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', **cust
     # mask
     cvr_mask = np.abs(cvr_data) < 1e-10
     # mask data
-    cvr_img_masked = cvr_data#np.ma.masked_where(cvr_mask, cvr_data)
+    cvr_img_masked = cvr_data #  np.ma.masked_where(cvr_mask, cvr_data)
     # data
     data = []
     # get bold data
@@ -140,8 +147,18 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', **cust
         data.append((stand(predictions_img.get_fdata()), "prediction"))
     except:
         print("No prediction img found")
+    # get voxel mask
+    try:
+        with open(os.path.join(folder, preamble + "_desc-data_info.json"), "r") as file:
+            data_info = json.load(file)
+        voxel_mask = image.load_img(data_info['voxel-mask-file']).get_fdata()
+        voxel_mask = np.ma.masked_where(voxel_mask, voxel_mask)
+        # voxel_mask = None
+    except:
+        voxel_mask = None
+        print("Could not load voxel mask")
 
-    img_show = IMGShow(cvr_img_masked, settings, 
+    img_show = IMGShow(cvr_img_masked, voxel_mask, settings, 
                         *data)
     
     img_show.fig.suptitle(preamble)
