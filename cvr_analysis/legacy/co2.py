@@ -37,13 +37,13 @@ class iCO2Stim:
     def plot_values(self) -> list[float]:
         return self._plot_values
     
-    def plot (self, ax : plt.Axes = None):
+    def plot(self, ax : plt.Axes = None):
         if ax is None:
             ax = plt
         if self.name:
             ax.plot(self._plot_times, self._plot_values, label = self.name)
         else:
-            ax.plot(self._plot_times, self._plot_values, label = self.name)
+            ax.plot(self._plot_times, self._plot_values)
 
     def save(self, location : str = "", repetitions : int = 1):
         dict_ = {
@@ -57,6 +57,11 @@ class iCO2Stim:
             }
         with open(os.path.join(location, f"{self.name}.json"), "w") as outfile:
             json.dump(dict_, outfile, indent="\t")
+
+    def uniformalSample(self, time_step):
+        times = np.arange(self.plot_times[0], self.plot_times[-1] + time_step, time_step)
+        values = np.interp(times, self.plot_times, self.plot_values)
+        return times, values
 
     def __repr__(self):
         return f"iCO2 stimulus {self.name}\n" f"Durations: {self.durations}\n" + f"Values: {self.values}"

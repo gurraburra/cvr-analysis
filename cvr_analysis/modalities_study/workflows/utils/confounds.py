@@ -7,7 +7,7 @@ from nilearn import glm
 class MotionConfounds(ProcessNode):
     outputs = ("motion_confounds_df", )
     
-    def _run(self, confounds_df : pd.DataFrame, derivatives : bool = True, powers : bool = True, standardize : bool = True) -> tuple:
+    def _run(self, confounds_df : pd.DataFrame, derivatives : bool = True, powers : bool = True) -> tuple:
         # determine which confounds to include
         include = [""]
         if derivatives:
@@ -25,7 +25,5 @@ class MotionConfounds(ProcessNode):
                 confound_names.append(base + add)
 
         confound_selected = confounds_df.loc[:,confound_names]
-        if standardize:
-            confound_selected = (confound_selected - confound_selected.mean()) / confound_selected.std()
 
         return confound_selected, 

@@ -19,8 +19,8 @@ def createHashCheckOverride(
                         output_directory, subject, session, task, run, space,
                                 voxel_mask, roi_masker, spatial_smoothing_fwhm, 
                                     analysis_start_time, analysis_end_time, min_sample_freq, 
-                                        detrend_type, detrend_linear_order, detrend_endpoint_average, temporal_filter_freq, 
-                                            use_co2_regressor, motion_regressor_correlation_threshold,
+                                        detrend_linear_order, temporal_filter_freq, 
+                                            baseline_strategy, use_co2_regressor, confound_regressor_correlation_threshold,
                                                 maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, correlation_window,
                                                     force_run = False):
     # folder for files
@@ -40,23 +40,9 @@ def createHashCheckOverride(
     if voxel_mask is None:
         raise ValueError(f"please specify which voxel mask to be used")
     
-    # check linear detrend type
-    if detrend_type is None:
-        detrend_endpoint_average = None
+    # check if linear order = 0 -> set to = None
+    if int(detrend_linear_order) == 0:
         detrend_linear_order = None
-    elif detrend_type == "linear":
-        detrend_endpoint_average = None
-        # check if linear order = None -> set type = None
-        if detrend_linear_order is None or int(detrend_linear_order) == 0:
-            detrend_type = None
-            detrend_linear_order = None
-    elif detrend_type == "endpoints":
-        detrend_linear_order = None
-        # check if endpoint average = None -> set type = None
-        if detrend_endpoint_average is None:
-            detrend_type = None
-    else:
-        raise ValueError("'detrend_type' must either be 'linear', 'endpoints' or 'None'")
    
     # analysis info
     analysis_info = {
@@ -66,12 +52,11 @@ def createHashCheckOverride(
         "spatial-smoothing-fwhm"                    : try_conv(spatial_smoothing_fwhm, float),
         "min-sample-freq"                           : try_conv(min_sample_freq, float),
         "analysis-bounds"                           : try_conv((analysis_start_time, analysis_end_time), float),
-        "detrend_type"                              : try_conv(detrend_type, str),
         "detrend-linear-order"                      : try_conv(detrend_linear_order, int),
-        "detrend-endpoint-average"                  : try_conv(detrend_endpoint_average, float),
         "temporal-filter-freq"                      : try_conv(temporal_filter_freq, float),
+        "baseline-strategy"                         : try_conv(baseline_strategy, str),
         "use-co2-regressor"                         : bool(use_co2_regressor),
-        "motion-regressor-correlation-threshold"    : try_conv(motion_regressor_correlation_threshold, float),
+        "confound-regressor-correlation-threshold"  : try_conv(confound_regressor_correlation_threshold, float),
         "align-regressor-bounds"                    : try_conv((align_regressor_lower_bound, align_regressor_upper_bound), float),
         "maxcorr-bipolar"                           : bool(maxcorr_bipolar),
         "correlation-window"                        : try_conv(correlation_window, str),
@@ -102,9 +87,8 @@ def saveData(
                     voxel_mask_img, timeseries_masker, bold_tr, co2_event_name,
                         up_sampling_factor, up_sampled_sample_time,
                             # global co2 data
-                            motion_confound_names, motion_regressor_maxcorr, regression_confounds_df,
-                                global_preproc_timeseries, global_baseline, global_plateau, global_std, global_autocorrelation_timeshifts, global_autocorrelation_correlations, 
-                                    global_aligned_co2_timeseries, co2_baseline, co2_plateau, co2_std, co2_autocorrelation_timeshifts, co2_autocorrelation_correlations, 
+                                global_preproc_timeseries, global_rms, global_autocorrelation_timeshifts, global_autocorrelation_correlations, 
+                                    global_aligned_co2_timeseries, co2_rms, co2_autocorrelation_timeshifts, co2_autocorrelation_correlations, 
                                         global_co2_timeshift_maxcorr, global_co2_maxcorr, global_co2_timeshifts, global_co2_correlations, 
                                             global_co2_beta,
                                                 # bold alignement data
@@ -133,8 +117,8 @@ def saveData(
         timeseries_masker.inverse_transform(bold_timeshift_maxcorr).to_filename(preamble + "desc-cvrTimeshift_map.nii.gz")
         timeseries_masker.inverse_transform(bold_tsnr).to_filename(preamble + "desc-tsnr_map.nii.gz")
         timeseries_masker.inverse_transform(bold_r_squared).to_filename(preamble + "desc-rSquared_map.nii.gz")
+        timeseries_masker.inverse_transform(bold_maxcorr).to_filename(preamble + "desc-maxCorr_map.nii.gz")
         if full_output:
-            timeseries_masker.inverse_transform(bold_maxcorr).to_filename(preamble + "desc-maxCorr_map.nii.gz")
             timeseries_masker.inverse_transform(bold_dof.astype(np.int32)).to_filename(preamble + "desc-dof_map.nii.gz")
             timeseries_masker.inverse_transform(bold_nr_predictors.astype(np.int32)).to_filename(preamble + "desc-nrPredictors_map.nii.gz")
             timeseries_masker.inverse_transform(bold_adjusted_r_squared).to_filename(preamble + "desc-rSquaredAdjusted_map.nii.gz")            
@@ -156,8 +140,6 @@ def saveData(
             # co2 autocorrelation
             saveTimeseriesInfo(preamble + "desc-co2Autocorrelations_timeseries.json", co2_autocorrelation_timeshifts[0], co2_autocorrelation_timeshifts[1] - co2_autocorrelation_timeshifts[0])
             pd.Series(co2_autocorrelation_correlations).to_csv(preamble + "desc-co2Autocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
-            # motion confounds regressor maxcorr
-            pd.DataFrame({"motion_confound" : motion_confound_names, "regressor_maxcorr" : motion_regressor_maxcorr}).to_csv(preamble + "desc-maxcorrMotionRegressor_corr.tsv.gz", sep="\t", index = False, compression="gzip")
         # pd.Series(bold_timeshifts, name="timeshifts").to_csv(preamble + "desc-boldTimeshifts_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
         if full_output:
             pass
@@ -186,15 +168,9 @@ def saveData(
                     # global co2 data
                     "global-co2-timeshift-maxcorr"      : global_co2_timeshift_maxcorr,
                     "global-co2-maxcorr"                : global_co2_maxcorr,
-                    "co2-baseline"                      : co2_baseline,
-                    "co2-plateau"                       : co2_plateau,
-                    "co2-std"                           : co2_std,
-                    "global-baseline"                   : global_baseline,
-                    "global-plateau"                    : global_plateau,
-                    "global-std"                        : global_std,
-                    "global-co2_beta"                   : global_co2_beta,
-                    # bold regression data
-                    "regression-confounds"              : regression_confounds_df.columns.to_list(),
+                    "global-co2-beta"                   : global_co2_beta,
+                    "global-rms"                        : global_rms,
+                    "co2-rms"                           : co2_rms,
                     # bold alignment data
                     "global-regressor-timeshift"        : global_regressor_timeshift, 
                     "align-regressor-absolute-bounds"   : (align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound),

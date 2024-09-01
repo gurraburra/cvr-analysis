@@ -52,46 +52,23 @@ class DetrendTimeSeries(ProcessNode):
     """
     outputs = ("detrended_timeseries", )
 
-    def _run(self, timeseries : np.ndarray, sample_time : float, detrend_type : str = "linear", linear_order : int = 1, endpoint_average : float = 10) -> tuple:
-        # check detrend type
-        if detrend_type is None:
-            return timeseries,
-        elif detrend_type == "endpoints":
-            # check endpoints average order
-            if endpoint_average is None:
-                return timeseries, 
-            # convert to indexes to average
-            idx_mean = max(int(endpoint_average / sample_time), 1)
-            detrend_func = partial(self._endPointDetrend, idx_mean = idx_mean)
-        elif detrend_type == "linear":
-            # check linear order 
-            if linear_order is None or int(linear_order) == 0:
-                return timeseries, 
-            detrend_func = partial(self._linearDetrend, linear_order = int(linear_order))
-        else:
-            raise ValueError("'detrend_type' must either be 'linear' or 'endpoints'")
+    def _run(self, timeseries : np.ndarray, sample_time : float, linear_order : int = 1) -> tuple:
+        # check linear order 
+        if linear_order is None or int(linear_order) == 0:
+            return timeseries, 
         # check timeseries type
         if isinstance(timeseries, np.ndarray) and (timeseries.ndim == 1 or timeseries.ndim == 2):
             if timeseries.ndim == 2:
-                detrended_timeseries = detrend_func(timeseries)
+                detrended_timeseries = self._linearDetrend(timeseries, int(linear_order))
             else:
-                detrended_timeseries = detrend_func(timeseries[:,None])[:,0]
+                detrended_timeseries = self._linearDetrend(timeseries[:,None], int(linear_order))[:,0]
         elif isinstance(timeseries, pd.DataFrame):
-            detrended_timeseries = pd.DataFrame(detrend_func(timeseries.to_numpy()), 
+            detrended_timeseries = pd.DataFrame(self._linearDetrend(timeseries.to_numpy(), int(linear_order)), 
                                                 index = timeseries.index, columns = timeseries.columns)
         else:
             raise ValueError(f"timeseries must be 1D/2D numpy array or pandas dataframe, '{type(timeseries)}' was given")
 
         return detrended_timeseries, 
-
-    def _endPointDetrend(self, timeseries, idx_mean):
-        # get length
-        l = timeseries.shape[0]
-        # get diff between endpoitns
-        end_point_diff = timeseries[-idx_mean:].mean(axis = 0) - timeseries[:idx_mean].mean(axis = 0)
-        # create trend
-        end_points_trend = np.arange(l)[:,None] * ( end_point_diff / (l - idx_mean))[None,:] - (end_point_diff * (l - 1) / (l - idx_mean) / 2) 
-        return timeseries - end_points_trend
     
     def _linearDetrend(self, timeseries, linear_order):
         # create linear confounds
@@ -137,7 +114,7 @@ class DownsampleTimeSeries(ProcessNode):
         if isinstance(timeseries, np.ndarray) and (timeseries.ndim == 1 or timeseries.ndim == 2):
             down_sampled_timeseries = timeseries[::down_sampling_factor]
         elif isinstance(timeseries, pd.DataFrame):
-            down_sampled_timeseries = timeseries[::down_sampling_factor].reset_index()
+            down_sampled_timeseries = timeseries[::down_sampling_factor].reset_index(drop = True)
         else:
             raise ValueError(f"timeseries must be 1D/2D numpy array or pandas dataframe, '{type(timeseries)}' was given")
         return down_sampled_timeseries, 
