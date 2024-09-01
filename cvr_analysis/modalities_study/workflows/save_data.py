@@ -41,7 +41,7 @@ def createHashCheckOverride(
         raise ValueError(f"please specify which voxel mask to be used")
     
     # check if linear order = 0 -> set to = None
-    if int(detrend_linear_order) == 0:
+    if detrend_linear_order is not None and int(detrend_linear_order) == 0:
         detrend_linear_order = None
    
     # analysis info
