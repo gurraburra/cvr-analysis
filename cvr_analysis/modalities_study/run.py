@@ -74,18 +74,16 @@ if __name__ == "__main__":
     parser.add_argument('--min-sample-freq', type=partial(handleNone, float), action="extend", nargs="+", help='minimum sample frequency')
     # analysis bounds
     parser.add_argument('--analysis-bounds', type=partial(handleTuple, float), action="extend", nargs="+", help='pair of lower and upper bounds for analysis (in seconds)')
-    # detrend type
-    parser.add_argument('--detrend-type', type=partial(handleNone, str), action="extend", nargs="+", help='detrend type')
     # detrend linear order
     parser.add_argument('--detrend-linear-order', type=partial(handleNone, int), action="extend", nargs="+", help='detrend linear order')
-    # detrend endpoint average
-    parser.add_argument('--detrend-endpoint-average', type=partial(handleNone, float), action="extend", nargs="+", help='detrend endpoint average')
     # filter freq
     parser.add_argument('--temporal-filter-freq', type=partial(handleTuple, float, ensure_tuple = False), action="extend", nargs="+", help='single filter value give lowpass filter and tuple give band-filter')
+    # baseline strategy
+    parser.add_argument('--baseline-strategy', type=str, action="extend", nargs="+", help='strategy to calculate baseline')
     # use co2 regressor
     parser.add_argument('--use-co2-regressor', type=handleBool, action="extend", nargs="+", help='use co2 regressor')
-    # motion confounds colinearity
-    parser.add_argument('--motion-regressor-correlation-threshold', type=partial(handleNone, float), action="extend", nargs="+", help='motion colinearity threshold')
+    # confound regressor correaltion threshold
+    parser.add_argument('--confound-regressor-correlation-threshold', type=partial(handleNone, float), action="extend", nargs="+", help='confound regressor correlation threshold')
     # align regressor bounds
     parser.add_argument('--align-regressor-bounds', type=partial(handleTuple, float), action="extend", nargs="+", help='pair of lower and upper bounds for aligning regressor (in seconds)')
     # bipolar correlation
@@ -152,36 +150,31 @@ if __name__ == "__main__":
         min_sample_freq_options = [2]
     else:
         min_sample_freq_options = args.min_sample_freq
-    # detrend type
-    if args.detrend_type is None:
-        detrend_type_options = ['linear']
-    else:
-        detrend_type_options = args.detrend_type
     # detrend
     if args.detrend_linear_order is None:
         detrend_linear_order_options = [None]
     else:
         detrend_linear_order_options = args.detrend_linear_order
-    # detrend
-    if args.detrend_endpoint_average is None:
-        detrend_endpoint_average_options = [None]
-    else:
-        detrend_endpoint_average_options = args.detrend_endpoint_average
     # temporal filter
     if args.temporal_filter_freq is None:
         temporal_filter_freq_options = [None]
     else:
         temporal_filter_freq_options = args.temporal_filter_freq
+    # baseline strategy
+    if args.baseline_strategy is None:
+        baseline_strategy_options = ['overall-mean']
+    else:
+        baseline_strategy_options = args.baseline_strategy
     # co2_options
     if args.use_co2_regressor is None:
         co2_options = [True]
     else:
         co2_options = args.use_co2_regressor
-    # motion correlation threshold
-    if args.motion_regressor_correlation_threshold is None:
-        motion_regressor_correlation_thr_options = [None]
+    # confound correlation threshold
+    if args.confound_regressor_correlation_threshold is None:
+        confound_regressor_correlation_thr_options = [None]
     else:
-        motion_regressor_correlation_thr_options = args.motion_regressor_correlation_threshold
+        confound_regressor_correlation_thr_options = args.confound_regressor_correlation_threshold
     # align regressor bounds
     if args.align_regressor_bounds is None:
         align_regressor_bounds_options = [(None, None)]
@@ -216,12 +209,11 @@ if __name__ == "__main__":
         "spatial-smoothing-fwhm" : smoothing_fwhm_options,
         "min-sample-freq" : min_sample_freq_options,
         "analysis-bounds" : analysis_bounds_options,
-        "detrend-type" : detrend_type_options,
         "detrend-linear-order" : detrend_linear_order_options,
-        "detrend-endpoint-average" : detrend_endpoint_average_options,
         "temporal-filter-freq" : temporal_filter_freq_options,
+        "baseline-strategy" : baseline_strategy_options,
         "use-co2-regressor" : co2_options,
-        "motion-regressor-correlation-threshold" : motion_regressor_correlation_thr_options,
+        "confound-regressor-correlation-threshold" : confound_regressor_correlation_thr_options,
         "align-regressor-bounds" : align_regressor_bounds_options,
         "maxcorr-bipolar" : bipolar_options,
         "correlation-window" : correlation_window_option,

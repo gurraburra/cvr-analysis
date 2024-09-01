@@ -40,7 +40,7 @@ class BaselineTimeSeries(ProcessNode):
     def _run(self, timeseries : np.ndarray, time_step : float, baseline_strategy : str = "signal-mean") -> tuple:
         # overall mean
         if baseline_strategy == 'overall-mean':
-            baseline = timeseries.mean(axis=0), 
+            baseline = timeseries.mean(axis=0)
         # initial mean
         elif baseline_strategy.startswith('initial-mean-'):
             try:
