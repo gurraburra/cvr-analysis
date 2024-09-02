@@ -103,6 +103,11 @@ class PercentageChangeTimeSeries(ProcessNode):
         # mask
         mask = np.logical_or(np.isclose(baseline,0), baseline < 0)
         baseline_with_inf = np.where(mask, np.inf, baseline)
+        # check dim of baseline
+        if baseline.ndim == 2:
+            cols_with_nan = np.any(np.isinf(baseline_with_inf), axis = 0)
+            baseline_with_inf[:,cols_with_nan] = np.inf
+        
         # percentage change
         percentage_timeseries = (timeseries - baseline) / baseline_with_inf * 100
     
@@ -301,8 +306,8 @@ class RegressCVR(ProcessNode):
         adjusted_r_squared = 1 - (1 - r_squared) * (n - 1) / (n - p - 1)
         # tsnr
         residual_sum_of_squares = np.sum((non_nan_bs - non_nan_pred)**2)
-        mean_signal = np.mean(non_nan_bs)
-        tsnr = mean_signal / np.sqrt(residual_sum_of_squares / n) if residual_sum_of_squares > 0 else np.nan
+        # the baseline mean signal is 100 since we assume the bold signal has been normed by the basline and multiplied by 100
+        tsnr = 100 / np.sqrt(residual_sum_of_squares / n) if residual_sum_of_squares > 0 else np.nan
         # regressor beta
         regressor_beta = betas[design_matrix.columns.get_loc("regressor")]
         # return
