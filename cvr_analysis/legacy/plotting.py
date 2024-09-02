@@ -112,10 +112,17 @@ class IMGShow:
 def stand(sig):
     return (sig - np.nanmean(sig, axis = -1)[..., np.newaxis]) / np.nanstd(sig, axis = -1)[..., np.newaxis]
 
-def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', **custom_settings):
+def maxMinNorn(sig):
+    return sig / (np.nanmax(sig, axis = -1) - np.nanmin(sig, axis = -1))[..., np.newaxis]
+
+norm_funcs = {"stand" : stand, "maxMinNorm" : maxMinNorn}
+
+def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', norm : str = "maxMinNorm", **custom_settings):
     # settings
     settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower", 'interpolation' : 'antialiased'}
     settings.update(custom_settings)
+    # norm_func
+    norm_func = norm_funcs[norm]
     # folder preamble
     folder, analys_file = os.path.split(analysis_file)
     preamble = analys_file.split("_desc-analys_info")[0]
@@ -132,19 +139,19 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', **cust
     # get bold data
     try:
         bold_img = image.load_img(os.path.join(folder, preamble + "_desc-preproc_bold.nii.gz"))
-        data.append((stand(bold_img.get_fdata()), "bold"))
+        data.append((norm_func(bold_img.get_fdata()), "bold"))
     except:
         print("No bold img found")
     # get aligned regressor data
     try:
         regressor_img = image.load_img(os.path.join(folder, preamble + "_desc-alignedRegressor_map.nii.gz"))
-        data.append((stand(regressor_img.get_fdata()), "regressor"))
+        data.append((norm_func(regressor_img.get_fdata()), "regressor"))
     except:
         print("No regressor img found")
     # get predictions
     try:
         predictions_img = image.load_img(os.path.join(folder, preamble + "_desc-predictions_bold.nii.gz"))
-        data.append((stand(predictions_img.get_fdata()), "prediction"))
+        data.append((norm_func(predictions_img.get_fdata()), "prediction"))
     except:
         print("No prediction img found")
     # get voxel mask
