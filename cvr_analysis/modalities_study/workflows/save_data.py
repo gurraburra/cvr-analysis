@@ -21,8 +21,9 @@ def createHashCheckOverride(
                                     analysis_start_time, analysis_end_time, min_sample_freq, 
                                         detrend_linear_order, temporal_filter_freq, 
                                             baseline_strategy, use_co2_regressor, confound_regressor_correlation_threshold,
-                                                maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, correlation_window,
-                                                    force_run = False):
+                                                initial_global_align_lower_bound, initial_global_align_upper_bound,
+                                                    maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, correlation_window,
+                                                        force_run = False):
     # folder for files
     analysis_name = "cvr-analysis-modalities-0.1rc12"
     files_folder = os.path.join(output_directory, f"sub-{subject}", f"ses-{session}", analysis_name)
@@ -56,10 +57,11 @@ def createHashCheckOverride(
         "temporal-filter-freq"                      : try_conv(temporal_filter_freq, float),
         "baseline-strategy"                         : try_conv(baseline_strategy, str),
         "use-co2-regressor"                         : bool(use_co2_regressor),
-        "confound-regressor-correlation-threshold"  : try_conv(confound_regressor_correlation_threshold, float),
+        "initial-global-align-bounds"               : try_conv((initial_global_align_lower_bound, initial_global_align_upper_bound), float),
         "align-regressor-bounds"                    : try_conv((align_regressor_lower_bound, align_regressor_upper_bound), float),
         "maxcorr-bipolar"                           : bool(maxcorr_bipolar),
         "correlation-window"                        : try_conv(correlation_window, str),
+        "confound-regressor-correlation-threshold"  : try_conv(confound_regressor_correlation_threshold, float),
     }
 
     # analysis id
@@ -132,13 +134,13 @@ def saveData(
             saveTimeseriesInfo(preamble + "desc-globalAlignedCO2Series_timeseries.json", 0, regression_down_sampled_sample_time)
             pd.DataFrame(np.vstack((global_preproc_timeseries, global_aligned_co2_timeseries)).T, columns=["global_series", "aligned_co2_series"]).to_csv(preamble + "desc-globalAlignedCO2Series_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
             # global co2 correlations
-            saveTimeseriesInfo(preamble + "desc-globalCO2Correlations_timeseries.json", global_co2_timeshifts[0], global_co2_timeshifts[1] - global_co2_timeshifts[0])
+            saveTimeseriesInfo(preamble + "desc-globalCO2Correlations_timeseries.json", global_co2_timeshifts[0], up_sampled_sample_time)
             pd.Series(global_co2_correlations).to_csv(preamble + "desc-globalCO2Correlations_timeseries.tsv.gz", sep="\t", index = False, header=False, compression="gzip")
             # global autocorrelation
-            saveTimeseriesInfo(preamble + "desc-globalAutocorrelations_timeseries.json", global_autocorrelation_timeshifts[0], global_autocorrelation_timeshifts[1] - global_autocorrelation_timeshifts[0])
+            saveTimeseriesInfo(preamble + "desc-globalAutocorrelations_timeseries.json", global_autocorrelation_timeshifts[0], up_sampled_sample_time)
             pd.Series(global_autocorrelation_correlations).to_csv(preamble + "desc-globalAutocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
             # co2 autocorrelation
-            saveTimeseriesInfo(preamble + "desc-co2Autocorrelations_timeseries.json", co2_autocorrelation_timeshifts[0], co2_autocorrelation_timeshifts[1] - co2_autocorrelation_timeshifts[0])
+            saveTimeseriesInfo(preamble + "desc-co2Autocorrelations_timeseries.json", co2_autocorrelation_timeshifts[0], up_sampled_sample_time)
             pd.Series(co2_autocorrelation_correlations).to_csv(preamble + "desc-co2Autocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
         # pd.Series(bold_timeshifts, name="timeshifts").to_csv(preamble + "desc-boldTimeshifts_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
         if full_output:

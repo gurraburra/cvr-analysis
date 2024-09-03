@@ -82,14 +82,16 @@ if __name__ == "__main__":
     parser.add_argument('--baseline-strategy', type=str, action="extend", nargs="+", help='strategy to calculate baseline')
     # use co2 regressor
     parser.add_argument('--use-co2-regressor', type=handleBool, action="extend", nargs="+", help='use co2 regressor')
-    # confound regressor correaltion threshold
-    parser.add_argument('--confound-regressor-correlation-threshold', type=partial(handleNone, float), action="extend", nargs="+", help='confound regressor correlation threshold')
+    # initial global align bounds
+    parser.add_argument('--initial-global-align-bounds', type=partial(handleTuple, float), action="extend", nargs="+", help='pair of lower and upper bounds for initial aligning regressor to global signal (in seconds)')
     # align regressor bounds
     parser.add_argument('--align-regressor-bounds', type=partial(handleTuple, float), action="extend", nargs="+", help='pair of lower and upper bounds for aligning regressor (in seconds)')
     # bipolar correlation
     parser.add_argument('--maxcorr-bipolar', type=handleBool, action="extend", nargs="+", help='bipolar correlation')
     # correlation window
     parser.add_argument('--correlation-window', type=partial(handleNone, str), action="extend", nargs="+", help='correlation window')
+    # confound regressor correaltion threshold
+    parser.add_argument('--confound-regressor-correlation-threshold', type=partial(handleNone, float), action="extend", nargs="+", help='confound regressor correlation threshold')
 
     # sampling options
     # sobol sampling
@@ -170,11 +172,11 @@ if __name__ == "__main__":
         co2_options = [True]
     else:
         co2_options = args.use_co2_regressor
-    # confound correlation threshold
-    if args.confound_regressor_correlation_threshold is None:
-        confound_regressor_correlation_thr_options = [None]
+    # initial global align bounds
+    if args.initial_global_align_bounds is None:
+        initial_global_align_bounds_options = [(None, None)]
     else:
-        confound_regressor_correlation_thr_options = args.confound_regressor_correlation_threshold
+        initial_global_align_bounds_options = args.initial_global_align_bounds
     # align regressor bounds
     if args.align_regressor_bounds is None:
         align_regressor_bounds_options = [(None, None)]
@@ -190,6 +192,11 @@ if __name__ == "__main__":
         correlation_window_option = [None]
     else:
         correlation_window_option = args.correlation_window
+    # confound correlation threshold
+    if args.confound_regressor_correlation_threshold is None:
+        confound_regressor_correlation_thr_options = [None]
+    else:
+        confound_regressor_correlation_thr_options = args.confound_regressor_correlation_threshold
     
     # get number of cores to use
     if args.nprocs <= -1:
@@ -213,10 +220,11 @@ if __name__ == "__main__":
         "temporal-filter-freq" : temporal_filter_freq_options,
         "baseline-strategy" : baseline_strategy_options,
         "use-co2-regressor" : co2_options,
-        "confound-regressor-correlation-threshold" : confound_regressor_correlation_thr_options,
+        "initial-global-align-bounds" : initial_global_align_bounds_options,
         "align-regressor-bounds" : align_regressor_bounds_options,
         "maxcorr-bipolar" : bipolar_options,
         "correlation-window" : correlation_window_option,
+        "confound-regressor-correlation-threshold" : confound_regressor_correlation_thr_options,
     }
 
     ordered_factors = tuple(options.keys())
@@ -235,7 +243,7 @@ if __name__ == "__main__":
             else:
                 return val
         # handle conversion
-        converters={"align-regressor-bounds": applyLiteralEvalStr, "analysis-bounds": applyLiteralEvalStr, "temporal-filter-freq": applyLiteralEvalStr}
+        converters={"initial-global-align-bounds": applyLiteralEvalStr, "align-regressor-bounds": applyLiteralEvalStr, "analysis-bounds": applyLiteralEvalStr, "temporal-filter-freq": applyLiteralEvalStr}
         for c_name, func in converters.items():
             if c_name in parameter_list.columns:
                 parameter_list[c_name] = parameter_list[c_name].apply(func)
@@ -308,12 +316,15 @@ if __name__ == "__main__":
             # replace - with _
             iter_args_dict = {factor.replace("-","_") : value for factor, value in zip(ordered_factors,iter_)}
 
-            # unpack align regressor bounds
-            iter_args_dict["align_regressor_lower_bound"], iter_args_dict["align_regressor_upper_bound"] = iter_args_dict["align_regressor_bounds"]
-            del iter_args_dict["align_regressor_bounds"]
             # unpack analysis bounds
             iter_args_dict["analysis_start_time"], iter_args_dict["analysis_end_time"] = iter_args_dict["analysis_bounds"]
             del iter_args_dict["analysis_bounds"]
+            # unpack align regressor bounds
+            iter_args_dict["align_regressor_lower_bound"], iter_args_dict["align_regressor_upper_bound"] = iter_args_dict["align_regressor_bounds"]
+            del iter_args_dict["align_regressor_bounds"]
+            # unpack initial global align bounds
+            iter_args_dict["initial_global_align_lower_bound"], iter_args_dict["initial_global_align_upper_bound"] = iter_args_dict["initial_global_align_bounds"]
+            del iter_args_dict["initial_global_align_bounds"]
 
             # print args if verbose
             if args.verbose:

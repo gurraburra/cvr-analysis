@@ -230,49 +230,35 @@ correlate_align_downsample_wf = ProcessWorkflow(
 ##--##--##--##--##--##--##--##--##--##--##--##
 # regress bold and regressor
 bold_regression = RegressCVR(description="regress single bold timeseries")
+global_co2_correlate_align_downsample = correlate_align_downsample_wf.copy()
 
 global_co2_regression_wf = ProcessWorkflow(
     (
         # correlate align downsample
-        (ProcessWorkflow.input._, correlate_align_downsample_wf.input[("sample_time", "down_sampling_factor")]),
-        (ProcessWorkflow.input.co2_signal_timeseries, correlate_align_downsample_wf.input.regressor_signal_timeseries),
-        (ProcessWorkflow.input.global_signal_timeseries, correlate_align_downsample_wf.input.bold_signal_ts),
-        (ProcessWorkflow.input.correlation_window, correlate_align_downsample_wf.input.correlation_window),
-        (ValueNode(False).output.value, correlate_align_downsample_wf.input.maxcorr_bipolar),
-        (ValueNode(None).output.value, correlate_align_downsample_wf.input.align_regressor_absolute_lower_bound),
-        (ValueNode(None).output.value, correlate_align_downsample_wf.input.align_regressor_absolute_upper_bound),
-        (correlate_align_downsample_wf.output.all, ProcessWorkflow.output._),
+        (ProcessWorkflow.input._, global_co2_correlate_align_downsample.input[("sample_time", "down_sampling_factor")]),
+        (ProcessWorkflow.input.co2_signal_timeseries, global_co2_correlate_align_downsample.input.regressor_signal_timeseries),
+        (ProcessWorkflow.input.global_signal_timeseries, global_co2_correlate_align_downsample.input.bold_signal_ts),
+        (ProcessWorkflow.input.correlation_window, global_co2_correlate_align_downsample.input.correlation_window),
+        (ValueNode(False).output.value, global_co2_correlate_align_downsample.input.maxcorr_bipolar),
+        (ValueNode(None).output.value, global_co2_correlate_align_downsample.input.align_regressor_absolute_lower_bound),
+        (ValueNode(None).output.value, global_co2_correlate_align_downsample.input.align_regressor_absolute_upper_bound),
+        (global_co2_correlate_align_downsample.output.all, ProcessWorkflow.output._),
         # regress
         (ProcessWorkflow.input.down_sampled_regression_confounds_signal_df, bold_regression.input.confounds_df),
         (ProcessWorkflow.input.confound_regressor_correlation_threshold, bold_regression.input.confound_regressor_correlation_threshold),
-        (correlate_align_downsample_wf.output.down_sampled_bold_signal_ts, bold_regression.input.bold_ts),
-        (correlate_align_downsample_wf.output.down_sampled_aligned_regressor_signal_timeseries, bold_regression.input.regressor_timeseries),
+        (global_co2_correlate_align_downsample.output.down_sampled_bold_signal_ts, bold_regression.input.bold_ts),
+        (global_co2_correlate_align_downsample.output.down_sampled_aligned_regressor_signal_timeseries, bold_regression.input.regressor_timeseries),
         (bold_regression.output.all / bold_regression.output["design_matrix", "betas", "predictions"], ProcessWorkflow.output._),
     ),
     description="global regressor timeshift and beta wf"
 )
 
+
 ##############################################
 # correlation bounds
 ##############################################
-# global regressor timeshift
-global_global_timeshift = ValueNode(0,  description="timeshift reference for global regressor")
-global_co2_timeshift = ProcessWorkflow(((ProcessWorkflow.input.global_co2_timeshift_maxcorr, ProcessWorkflow.output._),), description="global co2 timeshift dummy")
-
-global_regressor_timeshift = ConditionalNode("use_co2_regressor", 
-                                        {True : global_co2_timeshift, False : global_global_timeshift},
-                                            output_mapping={"global_regressor_timeshift" : (global_global_timeshift.output.value, global_co2_timeshift.output.global_co2_timeshift_maxcorr)},
-                                            description="global regressor timeshift")
-
-# regressore timeshift reference
-no_timeshift_reference = ValueNode(0,  description="no global regressor timeshift reference")
-global_regressor_timeshift_dummy = ProcessWorkflow(((ProcessWorkflow.input.global_regressor_timeshift, ProcessWorkflow.output.global_regressor_timeshift),))
-regressor_timeshift_reference = ConditionalNode("use_global_regressor_timeshift_reference",
-                                                {True : global_regressor_timeshift_dummy, False : no_timeshift_reference},
-                                                    default_condition=True,
-                                                        output_mapping={"regressor_timeshift_reference" : (global_regressor_timeshift_dummy.output.global_regressor_timeshift, no_timeshift_reference.output.value)},
-                                                            description="regressor timeshift reference")
-
+# global regressor correlate
+correlate_global_regressor_timeseries = Correlate(description="global regressor timeshift")
 # add if not None
 add_none_lower = CustomNode(lambda x = None, y = None : x + y if x is not None and y is not None else None, description="add none")
 add_none_upper = add_none_lower.copy()
@@ -313,18 +299,20 @@ setup_regression_wf = ProcessWorkflow(
         (global_co2_regression_wf.output.down_sampled_bold_signal_ts, ProcessWorkflow.output.down_sampled_global_signal_timeseries),
         (global_co2_regression_wf.output.down_sampled_aligned_regressor_signal_timeseries, ProcessWorkflow.output.down_sampled_global_aligned_co2_signal_timeseries),
         (global_co2_regression_wf.output.regressor_beta, ProcessWorkflow.output.global_co2_beta),
-        # global regressor timeshift
-        (ProcessWorkflow.input._, global_regressor_timeshift.input.use_co2_regressor),
-        (global_co2_regression_wf.output.timeshift_maxcorr, global_regressor_timeshift.input.global_co2_timeshift_maxcorr),
-        (global_regressor_timeshift.output.global_regressor_timeshift, ProcessWorkflow.output.global_regressor_timeshift),
-        # regressor timeshift reference
-        (ProcessWorkflow.input.use_global_regressor_timeshift_reference, regressor_timeshift_reference.input.use_global_regressor_timeshift_reference),
-        (global_regressor_timeshift.output.global_regressor_timeshift, regressor_timeshift_reference.input.global_regressor_timeshift),
+        # initial global regressor alignment
+        (ProcessWorkflow.input.sample_time, correlate_global_regressor_timeseries.input.time_step),
+        (ProcessWorkflow.input.initial_global_align_lower_bound, correlate_global_regressor_timeseries.input.lower_limit),
+        (ProcessWorkflow.input.initial_global_align_upper_bound, correlate_global_regressor_timeseries.input.upper_limit),
+        (ProcessWorkflow.input.correlation_window, correlate_global_regressor_timeseries.input.window),
+        (ValueNode(False).output.value, correlate_global_regressor_timeseries.input.bipolar),
+        (signal_timeseries_wf.output.global_signal_timeseries, correlate_global_regressor_timeseries.input.timeseries_a),
+        (choose_regressor.output.signal_timeseries, correlate_global_regressor_timeseries.input.timeseries_b),
+        (correlate_global_regressor_timeseries.output.timeshift_maxcorr, ProcessWorkflow.output.global_regressor_timeshift),
         # correlation bounds
         (ProcessWorkflow.input.align_regressor_lower_bound, add_none_lower.input.x),
         (ProcessWorkflow.input.align_regressor_upper_bound, add_none_upper.input.x),
-        (regressor_timeshift_reference.output.regressor_timeshift_reference, add_none_lower.input.y),
-        (regressor_timeshift_reference.output.regressor_timeshift_reference, add_none_upper.input.y),
+        (correlate_global_regressor_timeseries.output.timeshift_maxcorr, add_none_lower.input.y),
+        (correlate_global_regressor_timeseries.output.timeshift_maxcorr, add_none_upper.input.y),
         (add_none_lower.output.output, ProcessWorkflow.output.align_regressor_absolute_lower_bound),
         (add_none_upper.output.output, ProcessWorkflow.output.align_regressor_absolute_upper_bound),
     ),
@@ -378,8 +366,7 @@ iterate_cvr_wf = ProcessWorkflow(
 regression_wf = ProcessWorkflow(
     (
         # regression setup
-        (ProcessWorkflow.input._, setup_regression_wf.input.all - setup_regression_wf.input.use_global_regressor_timeshift_reference),
-        (ValueNode(True).output.value, setup_regression_wf.input.use_global_regressor_timeshift_reference),
+        (ProcessWorkflow.input._, setup_regression_wf.input.all),
         (setup_regression_wf.output.all, ProcessWorkflow.output._),
         # iterative regression
         (ProcessWorkflow.input._, iterate_cvr_wf.input[("sample_time", "down_sampling_factor", "maxcorr_bipolar", "correlation_window", "confound_regressor_correlation_threshold")]),
