@@ -102,14 +102,14 @@ class PercentageChangeTimeSeries(ProcessNode):
     def _run(self, timeseries : np.ndarray, baseline : np.ndarray,) -> tuple:
         # mask
         mask = np.logical_or(np.isclose(baseline,0), baseline < 0)
-        baseline_with_inf = np.where(mask, np.inf, baseline)
+        baseline_with_nan = np.where(mask, np.nan, baseline)
         # check dim of baseline
         if baseline.ndim == 2:
-            cols_with_nan = np.any(np.isinf(baseline_with_inf), axis = 0)
-            baseline_with_inf[:,cols_with_nan] = np.inf
+            cols_with_nan = np.any(np.isnan(baseline_with_nan), axis = 0)
+            baseline_with_nan[:,cols_with_nan] = np.nan
         
         # percentage change
-        percentage_timeseries = (timeseries - baseline) / baseline_with_inf * 100
+        percentage_timeseries = (timeseries - baseline) / baseline_with_nan * 100
     
         return percentage_timeseries, timeseries - baseline
     
@@ -143,32 +143,14 @@ class Correlate(ProcessNode):
     """
     outputs = ("timeshift_maxcorr", "maxcorr", "timeshifts", "correlations")
     def _run(self, timeseries_a : np.ndarray, timeseries_b : np.ndarray, time_step : float, lower_limit : int = None, upper_limit : int = None, bipolar : bool = True, window : str = None) -> tuple:
-        # handle leading and trailing nan values
-        # series a
-        timeseries_a_nan = np.isnan(timeseries_a)
-        timeseries_a_leading_nan = timeseries_a_nan.argmin()
-        timeseries_a_trailing_nan = timeseries_a_nan[::-1].argmin()
-        if any(timeseries_a_nan[timeseries_a_leading_nan:len(timeseries_a) - timeseries_a_trailing_nan]):
-            raise ValueError("Series a contains intermediate nan values.")
-        timeseries_a_nan_removed = timeseries_a[timeseries_a_leading_nan:len(timeseries_a) - timeseries_a_trailing_nan]
-        # series b
-        timeseries_b_nan = np.isnan(timeseries_b)
-        timeseries_b_leading_nan = timeseries_b_nan.argmin()
-        timeseries_b_trailing_nan = timeseries_b_nan[::-1].argmin()
-        if any(timeseries_b_nan[timeseries_b_leading_nan:len(timeseries_b) - timeseries_b_trailing_nan]):
-            raise ValueError("Series b contains intermediate nan values.")
-        timeseries_b_nan_removed = timeseries_b[timeseries_b_leading_nan:len(timeseries_b) - timeseries_b_trailing_nan]
-
         # timeshifts
         timeshifts = (np.arange(-len(timeseries_b)+1, len(timeseries_a), 1)) * time_step
-
         # mask
         mask = np.full_like(timeshifts, True, dtype = bool)
         if lower_limit is not None:
             mask[timeshifts < lower_limit] = False
         if upper_limit is not None:
             mask[timeshifts > upper_limit] = False
-
         # check mask
         if not np.any(mask):
             if lower_limit is not None and lower_limit == upper_limit:
@@ -177,16 +159,41 @@ class Correlate(ProcessNode):
                 mask[index] = True
             else:
                 raise ValueError("Incorrect limits specified.")
-
         # mask timeshifts
         timeshifts = timeshifts[mask]
-
+        # nan values to return
+        nan_values = np.nan, np.nan, timeshifts, np.full_like(timeshifts, np.nan)
+        # handle leading and trailing nan values
+        # series a
+        timeseries_a_nan = np.isnan(timeseries_a)
+        # check if all nan
+        if np.all(timeseries_a_nan):
+            return nan_values
+        # remove trailing and leadning
+        timeseries_a_leading_nan = timeseries_a_nan.argmin()
+        timeseries_a_trailing_nan = timeseries_a_nan[::-1].argmin()
+        # check intermediate
+        if any(timeseries_a_nan[timeseries_a_leading_nan:len(timeseries_a) - timeseries_a_trailing_nan]):
+            raise ValueError("Series a contains intermediate nan values.")
+        timeseries_a_nan_removed = timeseries_a[timeseries_a_leading_nan:len(timeseries_a) - timeseries_a_trailing_nan]
+        # series b
+        timeseries_b_nan = np.isnan(timeseries_b)
+        # check if all nan
+        if np.all(timeseries_b_nan):
+            return nan_values
+        # remove leading and trailing nans
+        timeseries_b_leading_nan = timeseries_b_nan.argmin()
+        timeseries_b_trailing_nan = timeseries_b_nan[::-1].argmin()
+        # check for intermediate nans
+        if any(timeseries_b_nan[timeseries_b_leading_nan:len(timeseries_b) - timeseries_b_trailing_nan]):
+            raise ValueError("Series b contains intermediate nan values.")
+        timeseries_b_nan_removed = timeseries_b[timeseries_b_leading_nan:len(timeseries_b) - timeseries_b_trailing_nan]
         # check std before caculating correlations
         timeseries_a_std = timeseries_a_nan_removed.std()
         timeseries_b_std = timeseries_b_nan_removed.std()
         # if close to zero -> return directly
         if np.isclose(timeseries_a_std, 0) or np.isclose(timeseries_b_std, 0):
-            return 0, 0, timeshifts, np.zeros_like(timeshifts)
+            return nan_values
         else:
             # length
             len_a = len(timeseries_a_nan_removed)
@@ -224,7 +231,7 @@ class Correlate(ProcessNode):
             idx_before_masking = np.arange(len(mask))[mask][index]
             overlap = min(idx_before_masking + 1, len_a) - max(idx_before_masking - len_b + 1, 0)
             if overlap < 2:
-                return 0, 0, timeshifts, np.zeros_like(timeshifts)
+                return nan_values
             else:
                 # correlation at idx_before_masking
                 corr_at_index = pearsonr(timeseries_a_nan_removed[max(idx_before_masking - len_b + 1, 0): min(idx_before_masking + 1, len_a)], timeseries_b_nan_removed[max(len_b - idx_before_masking - 1, 0) : min(len_a + len_b - idx_before_masking - 1, len_b)]).statistic
@@ -238,6 +245,9 @@ class AlignTimeSeries(ProcessNode):
     outputs = ("aligned_timeseries",)
 
     def _run(self, timeseries : np.ndarray, timeshift : float, time_step : float, length : int, fill_nan : bool = True) -> tuple:
+        # check if nan
+        if np.isnan(timeshift):
+            return np.full(length, np.nan)
         # convert to index
         timeshift_index = int(round(timeshift / time_step, 0))
         # fill nan
@@ -278,6 +288,10 @@ class RegressCVR(ProcessNode):
             design_matrix["constant"] = 1
         # find nan rows
         nan_entries = design_matrix.isna().any(axis=1) | np.isnan(bold_ts)
+        # check if no valid entries
+        if np.all(nan_entries):
+            # return all nans
+            return 0, design_matrix.shape[1], np.nan, design_matrix, np.full(design_matrix.shape[1], np.nan), np.full_like(bold_ts, np.nan), np.nan, np.nan, np.nan
         non_nan_dm = design_matrix[~nan_entries]
         non_nan_bs = bold_ts[~nan_entries]
         # threshold conofunds
