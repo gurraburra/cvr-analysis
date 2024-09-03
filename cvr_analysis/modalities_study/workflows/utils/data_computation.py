@@ -37,7 +37,7 @@ class BaselineTimeSeries(ProcessNode):
     """
     outputs = ("baseline", )
 
-    def _run(self, timeseries : np.ndarray, time_step : float, baseline_strategy : str = "signal-mean") -> tuple:
+    def _run(self, timeseries : np.ndarray, time_step : float, baseline_strategy : str = "overall-mean") -> tuple:
         # overall mean
         if baseline_strategy == 'overall-mean':
             baseline = timeseries.mean(axis=0)
