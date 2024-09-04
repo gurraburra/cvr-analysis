@@ -329,18 +329,20 @@ setup_regression_wf = ProcessWorkflow(
 # iterate correlate align over bold timeseries
 ##############################################
 
-iterate_correlate_align_downsample_wf = IteratingNode(correlate_align_downsample_wf.copy(), iterating_inputs="bold_signal_ts", iterating_name="bold", parallel_processing=True, show_pbar=True, description="iterate correlate, align, downsample bold timeseries")
+iterate_correlate_align_downsample_wf = IteratingNode(correlate_align_downsample_wf.copy(), iterating_inputs="bold_signal_ts", iterating_name="bold", description="iterate correlate, align, downsample bold timeseries")
 
 ##############################################
 # iterate calculate cvr over bold timeseries
 ##############################################
 
-iterate_regress = IteratingNode(bold_regression.copy(), iterating_inputs=("bold_ts", "regressor_timeseries"), iterating_name="bold", exclude_outputs=("design_matrix", "betas"), parallel_processing=True, show_pbar=True, description="iterative calculate cvr")
+iterate_regress = IteratingNode(bold_regression.copy(), iterating_inputs=("bold_ts", "regressor_timeseries"), iterating_name="bold", exclude_outputs=("design_matrix", "betas"), description="iterative calculate cvr")
 
 # %%
 iterate_cvr_wf = ProcessWorkflow(
     (
         # iterate align correlate align downsample 
+        (ProcessWorkflow.input.nr_parallel_processes, iterate_correlate_align_downsample_wf.input.boldIter_nr_parallel_processes),
+        (ProcessWorkflow.input.show_pbar, iterate_correlate_align_downsample_wf.input.boldIter_show_pbar),
         (ProcessWorkflow.input.bold_signal_timeseries.T, iterate_correlate_align_downsample_wf.input.boldIter_bold_signal_ts),
         (ProcessWorkflow.input.regressor_signal_timeseries, iterate_correlate_align_downsample_wf.input.regressor_signal_timeseries),
         (ProcessWorkflow.input.sample_time, iterate_correlate_align_downsample_wf.input.sample_time),
@@ -351,6 +353,8 @@ iterate_cvr_wf = ProcessWorkflow(
         (ProcessWorkflow.input.correlation_window, iterate_correlate_align_downsample_wf.input.correlation_window),
         (iterate_correlate_align_downsample_wf.output.all, ProcessWorkflow.output._),
         # iterate calculate cvr
+        (ProcessWorkflow.input.nr_parallel_processes, iterate_regress.input.boldIter_nr_parallel_processes),
+        (ProcessWorkflow.input.show_pbar, iterate_regress.input.boldIter_show_pbar),
         (ProcessWorkflow.input.down_sampled_regression_confounds_signal_df, iterate_regress.input.confounds_df),
         (ProcessWorkflow.input.confound_regressor_correlation_threshold, iterate_regress.input.confound_regressor_correlation_threshold),
         (iterate_correlate_align_downsample_wf.output.boldIter_down_sampled_bold_signal_ts, iterate_regress.input.boldIter_bold_ts),
@@ -369,7 +373,7 @@ regression_wf = ProcessWorkflow(
         (ProcessWorkflow.input._, setup_regression_wf.input.all),
         (setup_regression_wf.output.all, ProcessWorkflow.output._),
         # iterative regression
-        (ProcessWorkflow.input._, iterate_cvr_wf.input[("sample_time", "down_sampling_factor", "maxcorr_bipolar", "correlation_window", "confound_regressor_correlation_threshold")]),
+        (ProcessWorkflow.input._, iterate_cvr_wf.input[("nr_parallel_processes", "show_pbar", "sample_time", "down_sampling_factor", "maxcorr_bipolar", "correlation_window", "confound_regressor_correlation_threshold")]),
         (setup_regression_wf.output.bold_signal_timeseries, iterate_cvr_wf.input.bold_signal_timeseries),
         (setup_regression_wf.output.regressor_signal_timeseries, iterate_cvr_wf.input.regressor_signal_timeseries),
         (setup_regression_wf.output.down_sampled_regression_confounds_signal_df, iterate_cvr_wf.input.down_sampled_regression_confounds_signal_df),

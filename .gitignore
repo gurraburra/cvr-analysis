@@ -4,3 +4,4 @@ usefull_notebooks
 *pycache*
 .vscode
 test*
+build/

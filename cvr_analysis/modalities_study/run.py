@@ -69,7 +69,7 @@ if __name__ == "__main__":
     # roi mask
     parser.add_argument('--roi-masker', type=partial(handleNone, str), action="extend", nargs="+", help='roi mask for timeseries')
     # smoothing
-    parser.add_argument('--spatial-smoothing-fwhm', type=partial(handleNone, float), action="extend", nargs="+", help='correlationity threshold')
+    parser.add_argument('--spatial-smoothing-fwhm', type=partial(handleNone, float), action="extend", nargs="+", help='spatial smoothing full-width half-maximum in mm')
     # min sampling freq
     parser.add_argument('--min-sample-freq', type=partial(handleNone, float), action="extend", nargs="+", help='minimum sample frequency')
     # analysis bounds
@@ -334,7 +334,7 @@ if __name__ == "__main__":
                 print()
 
             # run workflow
-            cvr_wf.run(ignore_cache = False, save_data = True, nr_processes = nprocs,
+            cvr_wf.run(ignore_cache = False, save_data = True, nr_parallel_processes = nprocs,
                                 bids_directory = args.bids_dir, verbose = args.verbose, force_run = args.force_run, full_output = args.full_output, output_directory = args.output_dir, 
                                         **iter_args_dict)
 
