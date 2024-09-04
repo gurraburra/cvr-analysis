@@ -329,13 +329,13 @@ setup_regression_wf = ProcessWorkflow(
 # iterate correlate align over bold timeseries
 ##############################################
 
-iterate_correlate_align_downsample_wf = IteratingNode(correlate_align_downsample_wf.copy(), iterating_inputs="bold_signal_ts", iterating_name="bold", description="iterate correlate, align, downsample bold timeseries")
+iterate_correlate_align_downsample_wf = IteratingNode(correlate_align_downsample_wf.copy(), iterating_inputs="bold_signal_ts", iterating_name="bold", description="iterate correlate, align, downsample bold timeseries").setDefaultInputs(boldIter_nr_parallel_processes = -1)
 
 ##############################################
 # iterate calculate cvr over bold timeseries
 ##############################################
 
-iterate_regress = IteratingNode(bold_regression.copy(), iterating_inputs=("bold_ts", "regressor_timeseries"), iterating_name="bold", exclude_outputs=("design_matrix", "betas"), description="iterative calculate cvr")
+iterate_regress = IteratingNode(bold_regression.copy(), iterating_inputs=("bold_ts", "regressor_timeseries"), iterating_name="bold", exclude_outputs=("design_matrix", "betas"), description="iterative calculate cvr").setDefaultInputs(boldIter_nr_parallel_processes = -1)
 
 # %%
 iterate_cvr_wf = ProcessWorkflow(
