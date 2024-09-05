@@ -317,7 +317,11 @@ class RegressCVR(ProcessNode):
         non_nan_pred = reg.predict(non_nan_dm)
         # r_squared
         r_squared = r2_score(non_nan_bs, non_nan_pred)
-        adjusted_r_squared = 1 - (1 - r_squared) * (n - 1) / (n - p - 1)
+        # adjusted r-squared
+        if n - p - 1 > 0:
+            adjusted_r_squared = 1 - (1 - r_squared) * (n - 1) / (n - p - 1)
+        else:
+            adjusted_r_squared = 0
         # tsnr
         residual_sum_of_squares = np.sum((non_nan_bs - non_nan_pred)**2)
         # the baseline mean signal is 100 since we assume the bold signal has been normed by the basline and multiplied by 100
