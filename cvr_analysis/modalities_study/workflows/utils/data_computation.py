@@ -234,7 +234,7 @@ class Correlate(ProcessNode):
                 return nan_values
             else:
                 # correlation at idx_before_masking
-                corr_at_index = pearsonr(timeseries_a_nan_removed[max(idx_before_masking - len_b + 1, 0): min(idx_before_masking + 1, len_a)], timeseries_b_nan_removed[max(len_b - idx_before_masking - 1, 0) : min(len_a + len_b - idx_before_masking - 1, len_b)]).statistic
+                corr_at_index = pearsonr(timeseries_a[max(idx_before_masking - len_b + 1, 0): min(idx_before_masking + 1, len_a)], timeseries_b[max(len_b - idx_before_masking - 1, 0) : min(len_a + len_b - idx_before_masking - 1, len_b)]).statistic
                 # correct correlation using correlation at index (otherwise windowing will lead to incorrect estimate)
                 correlations *= corr_at_index / correlations[index]
                     
