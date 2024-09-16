@@ -6,7 +6,11 @@ import sklearn.linear_model as lm
 from sklearn.metrics import r2_score
 import scipy.signal as sc_signal
 from scipy.stats import pearsonr
-
+from scipy.fft import rfft, irfft
+from sklearn.feature_selection import mutual_info_regression
+from nilearn import maskers
+from scipy.ndimage import median_filter, uniform_filter
+from nilearn import image
 
 class BaselinePlateau(ProcessNode):
     """
@@ -142,7 +146,7 @@ class Correlate(ProcessNode):
     to the right, i.e leads timeseries_a.
     """
     outputs = ("timeshift_maxcorr", "maxcorr", "timeshifts", "correlations")
-    def _run(self, timeseries_a : np.ndarray, timeseries_b : np.ndarray, time_step : float, lower_limit : int = None, upper_limit : int = None, bipolar : bool = True, window : str = None) -> tuple:
+    def _run(self, timeseries_a : np.ndarray, timeseries_b : np.ndarray, time_step : float, lower_limit : int = None, upper_limit : int = None, bipolar : bool = True, window : str = None, phat : bool = False, multi_peak_strategy : str = None, ref_timeshift : float = 0) -> tuple:
         # timeshifts
         timeshifts = (np.arange(-len(timeseries_b)+1, len(timeseries_a), 1)) * time_step
         # mask
@@ -160,34 +164,20 @@ class Correlate(ProcessNode):
             else:
                 raise ValueError("Incorrect limits specified.")
         # mask timeshifts
-        timeshifts = timeshifts[mask]
+        timeshifts_masked = timeshifts[mask]
         # nan values to return
-        nan_values = np.nan, np.nan, timeshifts, np.full_like(timeshifts, np.nan)
+        nan_values = np.nan, np.nan, timeshifts_masked, np.full_like(timeshifts_masked, np.nan)
         # handle leading and trailing nan values
         # series a
-        timeseries_a_nan = np.isnan(timeseries_a)
+        timeseries_a_nan_removed, timeseries_a_leading_nan, timeseries_a_trailing_nan = self.removeNan(timeseries_a)
         # check if all nan
-        if np.all(timeseries_a_nan):
+        if timeseries_a_nan_removed.size == 0:
             return nan_values
-        # remove trailing and leadning
-        timeseries_a_leading_nan = timeseries_a_nan.argmin()
-        timeseries_a_trailing_nan = timeseries_a_nan[::-1].argmin()
-        # check intermediate
-        if any(timeseries_a_nan[timeseries_a_leading_nan:len(timeseries_a) - timeseries_a_trailing_nan]):
-            raise ValueError("Series a contains intermediate nan values.")
-        timeseries_a_nan_removed = timeseries_a[timeseries_a_leading_nan:len(timeseries_a) - timeseries_a_trailing_nan]
         # series b
-        timeseries_b_nan = np.isnan(timeseries_b)
+        timeseries_b_nan_removed, timeseries_b_leading_nan, timeseries_b_trailing_nan = self.removeNan(timeseries_b)
         # check if all nan
-        if np.all(timeseries_b_nan):
+        if timeseries_b_nan_removed.size == 0:
             return nan_values
-        # remove leading and trailing nans
-        timeseries_b_leading_nan = timeseries_b_nan.argmin()
-        timeseries_b_trailing_nan = timeseries_b_nan[::-1].argmin()
-        # check for intermediate nans
-        if any(timeseries_b_nan[timeseries_b_leading_nan:len(timeseries_b) - timeseries_b_trailing_nan]):
-            raise ValueError("Series b contains intermediate nan values.")
-        timeseries_b_nan_removed = timeseries_b[timeseries_b_leading_nan:len(timeseries_b) - timeseries_b_trailing_nan]
         # check std before caculating correlations
         timeseries_a_std = timeseries_a_nan_removed.std()
         timeseries_b_std = timeseries_b_nan_removed.std()
@@ -196,50 +186,167 @@ class Correlate(ProcessNode):
             return nan_values
         else:
             # length
-            len_a = len(timeseries_a_nan_removed)
-            len_b = len(timeseries_b_nan_removed)
+            len_a_nan_removed = len(timeseries_a_nan_removed)
+            len_b_nan_removed = len(timeseries_b_nan_removed)
             # check window
             if window is None:
-                window_a = np.ones(len_a)
-                window_b = np.ones(len_b)
+                window_a = np.ones(len_a_nan_removed)
+                window_b = np.ones(len_b_nan_removed)
             else:
-                window_a = sc_signal.get_window(window, len_a)
-                window_b = sc_signal.get_window(window, len_b)
+                window_a = sc_signal.get_window(window, len_a_nan_removed)
+                window_b = sc_signal.get_window(window, len_b_nan_removed)
             # applying ahmming window (basically because RapidTide suggest so)
             windowed_a = timeseries_a_nan_removed * window_a
             windowed_b = timeseries_b_nan_removed * window_b
             # correlate
-            correlations = sc_signal.correlate(windowed_a, windowed_b)
+            correlations_nan_removed = self.xcorr(windowed_a, windowed_b, phat)#sc_signal.correlate(windowed_a, windowed_b)
             # add nan values
             correlations = np.concatenate(
                     (
                         np.full(timeseries_a_leading_nan + timeseries_b_trailing_nan, np.nan), 
-                        correlations,
+                        correlations_nan_removed,
                         np.full(timeseries_a_trailing_nan + timeseries_b_leading_nan, np.nan)
                     )
                 )
-            # bound correlations and timeshifts
-            correlations = correlations[mask]
+            # bound correlations
+            correlations_masked = correlations[mask]
+            # masked indices to convert between index and masked index
+            masked_indices = np.arange(len(mask))[mask]
             
-            # find max
+            # peak finding values (before adding nan)
             if bipolar:
-                index = np.nanargmax(np.abs(correlations))
+                p_corr_masked = np.abs(correlations_masked)
             else:
-                index = np.nanargmax(correlations)
-
+                p_corr_masked = correlations_masked
+            # check peak strategy 
+            if multi_peak_strategy is None:
+                index_masked = np.nanargmax(p_corr_masked)
+            elif multi_peak_strategy in ["max", "ref", "mi"]: 
+                # peak finding algorithm
+                p_corr_masked_removed_nan, p_corr_masked_leading_nan, _ = self.removeNan(p_corr_masked)
+                peaks_idx_masked = sc_signal.find_peaks(p_corr_masked_removed_nan, height = 0)[0] + p_corr_masked_leading_nan
+                
+                if peaks_idx_masked.size == 0:
+                    index_masked = np.nanargmax(p_corr_masked)
+                elif peaks_idx_masked.size == 1:
+                    index_masked = peaks_idx_masked[0]
+                else:
+                    if multi_peak_strategy == 'max':
+                        # choose peak with largest value
+                        index_masked = peaks_idx_masked[p_corr_masked[peaks_idx_masked].argmax()]
+                    elif multi_peak_strategy == 'ref':
+                        # choose peak closes to reference timeshift
+                        index_masked = peaks_idx_masked[np.abs(timeshifts_masked[peaks_idx_masked] - ref_timeshift).argmin()]
+                    elif multi_peak_strategy == 'mi':
+                        # choose the one with largest mutual information
+                        mi = []
+                        for peak_idx_masked in peaks_idx_masked:
+                            # convert masked peak to candidate peak
+                            peak_idx = masked_indices[peak_idx_masked]
+                            # convert to nan peak
+                            peak_idx_nan = peak_idx - timeseries_a_leading_nan - timeseries_b_trailing_nan
+                            # shift timeseries
+                            ser_a_mi, ser_b_mi = self.timeshiftedSeries(timeseries_a_nan_removed, timeseries_b_nan_removed, peak_idx_nan)
+                            # calculate mi
+                            mi.append(mutual_info_regression(ser_b_mi.reshape(-1,1), ser_a_mi))
+                        index_masked = peaks_idx_masked[np.argmax(mi)]
+            else:
+                raise ValueError(f"'multi_peak_strategy' can either be None, 'max', 'ref' or 'mi', '{multi_peak_strategy}' was given")
+                    
+            # index before applying mask
+            index = np.arange(len(mask))[mask][index_masked]
+            # index before adding nan
+            index_nan = index - timeseries_a_leading_nan - timeseries_b_trailing_nan
+            # timeshifted nan series
+            timeshifted_a_nan_removed, timeshifted_b_nan_removed = self.timeshiftedSeries(timeseries_a_nan_removed, timeseries_b_nan_removed, index_nan)
             # check overlap
-            idx_before_masking = np.arange(len(mask))[mask][index]
-            overlap = min(idx_before_masking + 1, len_a) - max(idx_before_masking - len_b + 1, 0)
-            if overlap < 2:
+            if timeshifted_a_nan_removed.size < 2:
                 return nan_values
             else:
                 # correlation at idx_before_masking
-                corr_at_index = pearsonr(timeseries_a[max(idx_before_masking - len_b + 1, 0): min(idx_before_masking + 1, len_a)], timeseries_b[max(len_b - idx_before_masking - 1, 0) : min(len_a + len_b - idx_before_masking - 1, len_b)]).statistic
+                corr_at_index = pearsonr(timeshifted_a_nan_removed, timeshifted_b_nan_removed).statistic
                 # correct correlation using correlation at index (otherwise windowing will lead to incorrect estimate)
-                correlations *= corr_at_index / correlations[index]
+                correlations_masked *= corr_at_index / correlations_masked[index_masked]
                     
-                return timeshifts[index], correlations[index], timeshifts, correlations
+                return timeshifts_masked[index_masked], correlations_masked[index_masked], timeshifts_masked, correlations_masked
+            
+    def removeNan(self, timeseries):
+        # series is nan
+        timeseries_nan = np.isnan(timeseries)
+        # remove trailing and leadning
+        # check if all nan
+        if np.all(timeseries_nan):
+            timeseries_leading_nan = len(timeseries)
+        else:
+            timeseries_leading_nan = timeseries_nan.argmin()
+        timeseries_trailing_nan = timeseries_nan[::-1].argmin()
+        # check intermediate
+        if np.any(timeseries_nan[timeseries_leading_nan:len(timeseries) - timeseries_trailing_nan]):
+            raise ValueError("Series a contains intermediate nan values.")
+    
+        return timeseries[timeseries_leading_nan:len(timeseries) - timeseries_trailing_nan], timeseries_leading_nan, timeseries_trailing_nan
         
+    def xcorr(self, s1, s2, phat = False):
+        s1 = np.asarray(s1)
+        s2 = np.asarray(s2)
+        length = len(s1) + len(s2) - 1
+        f_s1 = rfft(s1, length)
+        f_s2 = rfft(s2[::-1].conj(), length)
+
+        f_s = f_s1 * f_s2
+        if phat:
+            denom = abs(f_s)
+            denom[denom < 1e-6] = 1e-6
+            f_s = f_s / denom  # This line is the only difference between GCC-PHAT and normal cross correlation
+            # the phat seems to be sensitive to numerical issues at the endpoints leading to large values, therefore set these values to zero
+            corr = irfft(f_s, length)
+            zero_crossing = np.sign(corr[1:-2] * corr[2:-1]) < 0
+            leading = zero_crossing.argmax()
+            trailing = zero_crossing[::-1].argmax()
+            lim = len(corr) / 20
+            if leading < lim:
+                corr[ : 3 * (leading + 1)] = 0
+            if trailing < lim:
+                corr[len(corr) - 3 * (trailing + 1) : ] = 0
+            return corr
+        else:
+            return irfft(f_s, length)
+        
+    def timeshiftedSeries(self, ser_a, ser_b, timeshift_idx):
+        len_a, len_b = len(ser_a), len(ser_b)
+        slice_a = slice(max(timeshift_idx - len_b + 1, 0), min(max(timeshift_idx + 1, 0), len_a))
+        slice_b = slice(max(len_b - timeshift_idx - 1, 0), min(max(len_a + len_b - timeshift_idx - 1, 0), len_b))
+        
+        return ser_a[slice_a], ser_b[slice_b]
+    
+
+class FilterTimeshifts(ProcessNode):
+    outputs = ("filtered_timeshifts",)
+
+    def _run(self, timeseries_masker : maskers.NiftiMasker, timeshifts : np.ndarray, maxcorrs : float, maxcorr_threshold : float = 0.5, size : int = 3, filter_type : str = 'median') -> tuple:
+        # copy data
+        new_timeshift = timeshifts.copy()
+        # convert to img
+        new_timeshift_img = timeseries_masker.inverse_transform(new_timeshift)
+        # check filter type
+        if filter_type == 'median':
+            filter = median_filter
+        elif filter_type == 'mean':
+            filter = uniform_filter
+        else:
+            raise ValueError(f"'filter_type' can either be 'median' or 'mean', '{filter_type}' was given")
+        # filter data
+        filtered_timeshift_3d_data = filter(new_timeshift_img.get_fdata(), size = size)
+        # convert back to array
+        filtered_timesshift_data = timeseries_masker.transform(
+            image.new_img_like(new_timeshift_img, filtered_timeshift_3d_data)
+        )[0]
+        # get values to mask
+        mask = np.abs(maxcorrs) < maxcorr_threshold
+        # update those values
+        new_timeshift[mask] = filtered_timesshift_data[mask]
+        return new_timeshift        
+    
 
 class AlignTimeSeries(ProcessNode):
     outputs = ("aligned_timeseries",)

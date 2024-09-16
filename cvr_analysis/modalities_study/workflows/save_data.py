@@ -22,10 +22,12 @@ def createHashCheckOverride(
                                         detrend_linear_order, temporal_filter_freq, 
                                             baseline_strategy, use_co2_regressor, confound_regressor_correlation_threshold,
                                                 initial_global_align_lower_bound, initial_global_align_upper_bound,
-                                                    maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, correlation_window,
-                                                        force_run = False):
+                                                    maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, 
+                                                        correlation_window, correlation_multi_peak_strategy,
+                                                            filter_timeshifts_maxcorr_threshold, filter_timeshifts_size, filter_timeshifts_filter_type,
+                                                                force_run = False):
     # folder for files
-    analysis_name = "cvr-analysis-modalities-0.1rc12"
+    analysis_name = "cvr-analysis-modalities-0.1rc13"
     files_folder = os.path.join(output_directory, f"sub-{subject}", f"ses-{session}", analysis_name)
 
     # convert None
@@ -61,6 +63,10 @@ def createHashCheckOverride(
         "align-regressor-bounds"                    : try_conv((align_regressor_lower_bound, align_regressor_upper_bound), float),
         "maxcorr-bipolar"                           : bool(maxcorr_bipolar),
         "correlation-window"                        : try_conv(correlation_window, str),
+        "correlation-multi-peak-strategy"           : try_conv(correlation_multi_peak_strategy, str),
+        "filter-timeshifts-maxcorr-threshold"       : try_conv(filter_timeshifts_maxcorr_threshold, str),
+        "filter-timeshifts-size"                    : try_conv(filter_timeshifts_size, str),
+        "filter-timeshifts-filter-type"             : try_conv(filter_timeshifts_filter_type, str),
         "confound-regressor-correlation-threshold"  : try_conv(confound_regressor_correlation_threshold, float),
     }
 

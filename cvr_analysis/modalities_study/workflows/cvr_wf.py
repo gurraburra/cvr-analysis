@@ -13,12 +13,13 @@ cvr_analysis_wf = ProcessWorkflow(
         # post-processing
         (ProcessWorkflow.input._, post_processing_wf.input.all),
         # regression 
-        (ProcessWorkflow.input._, regression_wf.input[('nr_parallel_processes', 'show_pbar', 'confound_regressor_correlation_threshold', 'use_co2_regressor', 'initial_global_align_lower_bound', 'initial_global_align_upper_bound', 'align_regressor_lower_bound', 'align_regressor_upper_bound', 'maxcorr_bipolar', 'correlation_window', 'baseline_strategy')]),
+        (ProcessWorkflow.input._, regression_wf.input[('nr_parallel_processes', 'show_pbar', 'confound_regressor_correlation_threshold', 'use_co2_regressor', 'initial_global_align_lower_bound', 'initial_global_align_upper_bound', 'align_regressor_lower_bound', 'align_regressor_upper_bound', 'maxcorr_bipolar', 'correlation_window', 'correlation_phat', 'correlation_multi_peak_strategy', "filter_timeshifts_maxcorr_threshold", "filter_timeshifts_size", "filter_timeshifts_filter_type", 'baseline_strategy')]),
         (post_processing_wf.output.temporal_filtered_detrended_up_sampled_bold_timeseries, regression_wf.input.bold_timeseries),
         (post_processing_wf.output.temporal_filtered_detrended_up_sampled_co2_timeseries, regression_wf.input.co2_timeseries),
         (post_processing_wf.output.temporal_filtered_detrended_up_sampled_confounds_df, regression_wf.input.confounds_df),
         (post_processing_wf.output.up_sampling_factor, regression_wf.input.down_sampling_factor),
         (post_processing_wf.output.up_sampled_sample_time, regression_wf.input.sample_time),
+        (post_processing_wf.output.timeseries_masker, regression_wf.input.timeseries_masker),
         # save data
         (ProcessWorkflow.input._, conditionally_save_data.input[('analysis_file', 'analysis_dict', 'subject', 'session', 'task', 'run', 'space','save_data','full_output')]),
         # post-processing data
