@@ -333,9 +333,12 @@ class FilterTimeshifts(ProcessNode):
 
     def _run(self, timeseries_masker : maskers.NiftiMasker, timeshifts : np.ndarray, maxcorrs : float, maxcorr_threshold : float = 0.5, size : int = 3, filter_type : str = 'median') -> tuple:
         # copy data
-        new_timeshift = timeshifts.copy()
+        new_timeshifts = timeshifts.copy()
+        # check if None
+        if filter_type is None:
+            return new_timeshifts
         # convert to img
-        new_timeshift_img = timeseries_masker.inverse_transform(new_timeshift)
+        new_timeshifts_img = timeseries_masker.inverse_transform(new_timeshifts)
         # check filter type
         if filter_type == 'median':
             filter = median_filter
@@ -344,16 +347,16 @@ class FilterTimeshifts(ProcessNode):
         else:
             raise ValueError(f"'filter_type' can either be 'median' or 'mean', '{filter_type}' was given")
         # filter data
-        filtered_timeshift_3d_data = filter(new_timeshift_img.get_fdata(), size = size)
+        filtered_timeshift_3d_data = filter(new_timeshifts_img.get_fdata(), size = size)
         # convert back to array
         filtered_timesshift_data = timeseries_masker.transform(
-            image.new_img_like(new_timeshift_img, filtered_timeshift_3d_data)
+            image.new_img_like(new_timeshifts_img, filtered_timeshift_3d_data)
         )[0]
         # get values to mask
         mask = np.abs(maxcorrs) < maxcorr_threshold
         # update those values
-        new_timeshift[mask] = filtered_timesshift_data[mask]
-        return new_timeshift,
+        new_timeshifts[mask] = filtered_timesshift_data[mask]
+        return new_timeshifts,
     
 class PCAReducedTimeSeries(ProcessNode):
     outputs = ("reduced_timeseries", "pca_components", "explained_variance_ratio")

@@ -35,5 +35,8 @@ dynamic = ["version"]
 [project.optional-dependencies]
 test = ["jupyter", "ipywidgets", "ipympl"]
 
+[project.scripts]
+cvr-modality-study = "cvr_analysis.modalities_study.run:main"
+
 [tool.setuptools.dynamic]
 version = {attr = "cvr_analysis._version.__version__"}

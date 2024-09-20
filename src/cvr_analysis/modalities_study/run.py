@@ -41,8 +41,7 @@ def handleTuple(type_, arg, ensure_tuple = True, ensure_len_2 = True):
     else:
         return arg
 
-# main script
-if __name__ == "__main__":
+def main():
     # parse argument
     parser = argparse.ArgumentParser(description='Seed analysis')
     parser.add_argument('bids_dir', type=str, help='bids folder with data')
@@ -90,6 +89,22 @@ if __name__ == "__main__":
     parser.add_argument('--maxcorr-bipolar', type=handleBool, action="extend", nargs="+", help='bipolar correlation')
     # correlation window
     parser.add_argument('--correlation-window', type=partial(handleNone, str), action="extend", nargs="+", help='correlation window')
+    # correlation multi peak
+    parser.add_argument('--correlation-multi-peak-strategy', type=partial(handleNone, str), action="extend", nargs="+", help='strategy to decide between multiple peaks in the cross-correlation function, either "ref", "max" or "mi"')
+    # filter timeshifts type
+    parser.add_argument('--filter-timeshifts-filter-type', type=partial(handleNone, str), action="extend", nargs="+", help='type of filter, either "mean", "median" or "None"')
+    # filter timeshifts threshold
+    parser.add_argument('--filter-timeshifts-correlation-threshold', type=partial(handleNone, float), action="extend", nargs="+", help='upper correlation threshold for voxels to apply filter to')
+    # filter timeshifts size
+    parser.add_argument('--filter-timeshifts-size', type=partial(handleNone, int), action="extend", nargs="+", help='size of correlation window in voxels')
+    # refine regressor nr recursions
+    parser.add_argument('--refine-regressor-nr-recursion', type=partial(handleNone, int), action="extend", nargs="+", help='refine regressor nr recursions')
+    # refine regressor threshold
+    parser.add_argument('--refine-regressor-correlation-threshold', type=partial(handleNone, float), action="extend", nargs="+", help='lower correlation threshold for voxels to be used in refining regressor')
+    # refine regressor explained variance
+    parser.add_argument('--refine-regressor-explained-variance', type=partial(handleNone, float), action="extend", nargs="+", help='how much variance to be explained by pca components when refining regressor')
+    # ensure co2 units
+    parser.add_argument('--ensure-co2-units', type=handleBool, action="extend", nargs="+", help='ensure cvr maps are in co2 units by applying DTW if necessary')
     # confound regressor correaltion threshold
     parser.add_argument('--confound-regressor-correlation-threshold', type=partial(handleNone, float), action="extend", nargs="+", help='confound regressor correlation threshold')
 
@@ -182,16 +197,56 @@ if __name__ == "__main__":
         align_regressor_bounds_options = [(None, None)]
     else:
         align_regressor_bounds_options = args.align_regressor_bounds
-    # bipolar_options
+    # bipolar options
     if args.maxcorr_bipolar is None:
         bipolar_options = [True]
     else:
         bipolar_options = args.maxcorr_bipolar
-    # bipolar_options
+    # correlation options
     if args.correlation_window is None:
-        correlation_window_option = [None]
+        correlation_window_options = [None]
     else:
-        correlation_window_option = args.correlation_window
+        correlation_window_options = args.correlation_window
+    # correlation multi peak
+    if args.correlation_multi_peak_strategy is None:
+        correlation_multi_peak_strategy_options = [None]
+    else:
+        correlation_multi_peak_strategy_options = args.correlation_multi_peak_strategy
+    # filter timeshifts type
+    if args.filter_timeshifts_filter_type is None:
+        filter_timeshifts_filter_type_options = [None]
+    else:
+        filter_timeshifts_filter_type_options = args.filter_timeshifts_filter_type
+    # filter timeshifts threshold
+    if args.filter_timeshifts_correlation_threshold is None:
+        filter_timeshifts_correlation_threshold_options = [1.0]
+    else:
+        filter_timeshifts_correlation_threshold_options = args.filter_timeshifts_correlation_threshold
+    # filter timeshifts size
+    if args.filter_timeshifts_size is None:
+        filter_timeshifts_size_options = [3]
+    else:
+        filter_timeshifts_size_options = args.filter_timeshifts_size
+    # refine regressor nr recursions
+    if args.refine_regressor_nr_recursion is None:
+        refine_regressor_nr_recursion_options = [0]
+    else:
+        refine_regressor_nr_recursion_options = args.refine_regressor_nr_recursion
+    # refine regressor threshold
+    if args.refine_regressor_correlation_threshold is None:
+        refine_regressor_correlation_threshold_options = [0.5]
+    else:
+        refine_regressor_correlation_threshold_options = args.refine_regressor_correlation_threshold
+    # refine regressor explained variance
+    if args.refine_regressor_explained_variance is None:
+        refine_regressor_explained_variance_options = [0.8]
+    else:
+        refine_regressor_explained_variance_options = args.refine_regressor_explained_variance
+    # ensure co2 units
+    if args.ensure_co2_units is None:
+        ensure_co2_units_options = [False]
+    else:
+        ensure_co2_units_options = args.ensure_co2_units
     # confound correlation threshold
     if args.confound_regressor_correlation_threshold is None:
         confound_regressor_correlation_thr_options = [None]
@@ -223,8 +278,16 @@ if __name__ == "__main__":
         "initial-global-align-bounds" : initial_global_align_bounds_options,
         "align-regressor-bounds" : align_regressor_bounds_options,
         "maxcorr-bipolar" : bipolar_options,
-        "correlation-window" : correlation_window_option,
-        "confound-regressor-correlation-threshold" : confound_regressor_correlation_thr_options,
+        "correlation-window" : correlation_window_options,
+        "correlation-multi-peak-strategy"           : correlation_multi_peak_strategy_options,
+        "filter-timeshifts-filter-type"             : filter_timeshifts_filter_type_options,
+        "filter-timeshifts-correlation-threshold"   : filter_timeshifts_correlation_threshold_options,
+        "filter-timeshifts-size"                    : filter_timeshifts_size_options,
+        "refine-regressor-nr-recursions"            : refine_regressor_nr_recursion_options,
+        "refine-regressor-correlation-threshold"    : refine_regressor_correlation_threshold_options,
+        "refine-regressor-explained-variance"       : refine_regressor_explained_variance_options,
+        "ensure-co2-units"                          : ensure_co2_units_options,
+        "confound-regressor-correlation-threshold"  : confound_regressor_correlation_thr_options,
     }
 
     ordered_factors = tuple(options.keys())
@@ -343,3 +406,7 @@ if __name__ == "__main__":
         print()
         print("--- Done ---")
         print()
+
+# main script
+if __name__ == "__main__":
+    main()
