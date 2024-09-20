@@ -20,15 +20,19 @@ dependencies = [
     "nilearn",
     "numpy",
     "pandas",
-    "pyppca",
     "scikit_learn",
     "scipy",
     "setuptools",
     "statsmodels",
     "threadpoolctl",
-    "tqdm"
+    "tqdm",
+    "pybids",
+    "pyppca @ git+https://github.com/el-hult/pyppca",
+    "process_control @ git+https://github.com/gurraburra/process-control"
 ]
-dynamic = ["version"]
+
+[project.optional-dependencies]
+test = ["jupyter", "ipywidgets", "ipympl"]
 
 [tool.setuptools.dynamic]
 version = {attr = "cvr_analysis._version.__version__"}
