@@ -30,6 +30,7 @@ dependencies = [
     "pyppca @ git+https://github.com/el-hult/pyppca",
     "process_control @ git+https://github.com/gurraburra/process-control"
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 test = ["jupyter", "ipywidgets", "ipympl"]
