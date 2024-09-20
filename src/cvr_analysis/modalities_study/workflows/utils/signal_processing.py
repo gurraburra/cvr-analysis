@@ -4,7 +4,8 @@ import pandas as pd
 from nilearn import glm, signal
 from collections.abc import Iterable
 from scipy.signal import butter, sosfiltfilt
-from functools import partial
+from dtaidistance import dtw
+from scipy import stats
 
 class NewSampleTime(ProcessNode):
     outputs = ("up_sampling_factor", "new_sample_time")
@@ -118,5 +119,33 @@ class DownsampleTimeSeries(ProcessNode):
         else:
             raise ValueError(f"timeseries must be 1D/2D numpy array or pandas dataframe, '{type(timeseries)}' was given")
         return down_sampled_timeseries, 
+
+class MaskTimeSeries(ProcessNode):
+    """
+    Mask timeseries.
+    """
+    outputs = ("masked_timeseries",)
+
+    def _run(self, timeseries : np.ndarray, mask : np.ndarray) -> tuple:
+        return timeseries[mask], 
+
+class DTW(ProcessNode):
+    """
+    Dynamic time warping.
+    """
+    outputs = ("warped_timeseries",)
+
+    def _run(self, target_timeseries : np.ndarray, reference_timeseries : np.ndarray, time_step : float, window : float) -> tuple:
+        # get window window size
+        if window is None:
+            warp_window = None
+        else:
+            warp_window = int(window / time_step)
+
+        path = dtw.warping_path(stats.zscore(target_timeseries), stats.zscore(reference_timeseries), window = warp_window)
+
+        warped_timeseries, _ = dtw.warp(target_timeseries, reference_timeseries, path)
+
+        return np.array(warped_timeseries), 
 
     

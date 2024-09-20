@@ -11,6 +11,7 @@ from sklearn.feature_selection import mutual_info_regression
 from nilearn import maskers
 from scipy.ndimage import median_filter, uniform_filter
 from nilearn import image
+from pyppca import ppca
 
 class BaselinePlateau(ProcessNode):
     """
@@ -319,6 +320,13 @@ class Correlate(ProcessNode):
         
         return ser_a[slice_a], ser_b[slice_b]
     
+class HistPeak(ProcessNode):
+    outputs = ("histogram_peak", )
+
+    def _run(self, values : np.ndarray) -> tuple:
+        # count occurences
+        unique, counts = np.unique(values, return_counts=True)
+        return unique[counts.argmax()], 
 
 class FilterTimeshifts(ProcessNode):
     outputs = ("filtered_timeshifts",)
@@ -345,8 +353,39 @@ class FilterTimeshifts(ProcessNode):
         mask = np.abs(maxcorrs) < maxcorr_threshold
         # update those values
         new_timeshift[mask] = filtered_timesshift_data[mask]
-        return new_timeshift        
+        return new_timeshift,
     
+class PCAReducedTimeSeries(ProcessNode):
+    outputs = ("reduced_timeseries", "pca_components", "explained_variance_ratio")
+
+    def _run(self, timeseries : np.ndarray, explained_variance : float = 0.5) -> tuple:
+        # assert explained variance in between 0 and 1
+        assert explained_variance > 0 and explained_variance < 1, f"'explained_variance' needs to be between 0 and 1"
+        # apply pca
+        Y = timeseries.T
+        # iterate to make sure explained variance is explained
+        nr_components = 2
+        while nr_components < Y.shape[1]:
+            C, ss, M, X, Ye = ppca(Y, nr_components, False)
+            exp_var = self.explainedVarianceRatio(Ye, X, C, M)
+            if np.sum(exp_var) < explained_variance:
+                nr_components += 1
+            else:
+                break
+        # transform
+        Y_avg_reduced = X @ C.T + M
+
+        return Y_avg_reduced.T, C, exp_var
+
+    def explainedVarianceRatio(self, Y, X, C, M):
+        result = np.zeros(C.shape[1])
+        for ii in range(C.shape[1]):
+            X_ii = np.zeros_like(X)
+            X_ii[:, ii] = X[:, ii]
+            Y_approx_ii = X_ii @ C.T + M 
+
+            result[ii] = 1 - (np.linalg.norm(Y_approx_ii - Y) / np.linalg.norm(Y - M)) ** 2
+        return result
 
 class AlignTimeSeries(ProcessNode):
     outputs = ("aligned_timeseries",)
