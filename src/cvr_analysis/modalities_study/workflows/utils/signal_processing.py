@@ -24,12 +24,13 @@ class ResampleTimeSeries(ProcessNode):
     """
     outputs = ("resampled_times","resampled_timeseries") 
 
-    def _run(self, times : np.ndarray, timeseries : np.ndarray, sample_time : float, start_time : float = None, end_time : float = None) -> tuple:
+    def _run(self, times : np.ndarray, timeseries : np.ndarray, sample_time : float) -> tuple:
+        # return if none
+        if timeseries is None:
+            return None, None
         # check start/end time
-        if start_time is None:
-            start_time = np.min(times)
-        if end_time is None:
-            end_time = np.max(times)
+        start_time = np.min(times)
+        end_time = np.max(times)
 
         t_new = np.arange(start_time, end_time + sample_time, sample_time)
 
@@ -47,13 +48,47 @@ class ResampleTimeSeries(ProcessNode):
 
         return t_new, resampled_timeseries
     
+class TimeLimitTimeSeries(ProcessNode):
+    """
+    Time limit timeseries to specific time interval
+    """
+    outputs = ("limited_times", "limited_timeseries",) 
+
+    def _run(self, timeseries : np.ndarray, sample_time : float, start_time : float = None, end_time : float = None) -> tuple:
+        # return if none
+        if timeseries is None:
+            return None, None
+        # times
+        times = np.arange(timeseries.shape[0]) * sample_time
+        # check start/end time
+        if start_time is None:
+            start_idx = 0
+        else:
+            start_idx = np.argmin(np.abs(times - start_time))
+        if end_time is None:
+            end_idx = timeseries.shape[0]
+        else:
+            end_idx = np.argmin(np.abs(times - end_time)) + 1
+
+        if isinstance(timeseries, np.ndarray) and (timeseries.ndim == 1 or timeseries.ndim == 2):
+            limited_timeseries = timeseries[start_idx:end_idx]
+        elif isinstance(timeseries, pd.DataFrame):
+            limited_timeseries = timeseries[start_idx:end_idx].reset_index(drop = True)
+        else:
+            raise ValueError(f"timeseries must be 1D/2D numpy array or pandas dataframe, '{type(timeseries)}' was given")
+
+        return times[start_idx:end_idx], limited_timeseries, 
+    
 class DetrendTimeSeries(ProcessNode):
     """
     Detrend timeseries which is assumed to be evenly sampled 
     """
     outputs = ("detrended_timeseries", )
 
-    def _run(self, timeseries : np.ndarray, sample_time : float, linear_order : int = 1) -> tuple:
+    def _run(self, timeseries : np.ndarray, linear_order : int = 1) -> tuple:
+        # return if none
+        if timeseries is None:
+            return None
         # check linear order 
         if linear_order is None or int(linear_order) == 0:
             return timeseries, 
@@ -80,6 +115,9 @@ class TemporalFilterTimeSeries(ProcessNode):
     outputs = ("temporal_filtered_timeseries", )
 
     def _run(self, sample_time : float, timeseries : np.ndarray, filter_freq : float = None, filter_order : int = 6) -> tuple:
+        # return if none
+        if timeseries is None:
+            return None
         # check if filter freq is none, return directly
         if filter_freq is None:
             return timeseries,
@@ -112,6 +150,9 @@ class DownsampleTimeSeries(ProcessNode):
     outputs = ("down_sampled_timeseries",)
 
     def _run(self, down_sampling_factor : int, timeseries : np.ndarray) -> tuple:
+        # return if none
+        if timeseries is None:
+            return None
         if isinstance(timeseries, np.ndarray) and (timeseries.ndim == 1 or timeseries.ndim == 2):
             down_sampled_timeseries = timeseries[::down_sampling_factor]
         elif isinstance(timeseries, pd.DataFrame):
@@ -135,16 +176,16 @@ class DTW(ProcessNode):
     """
     outputs = ("warped_timeseries",)
 
-    def _run(self, target_timeseries : np.ndarray, reference_timeseries : np.ndarray, time_step : float, window : float) -> tuple:
+    def _run(self, reference_timeseries : np.ndarray, target_timeseries : np.ndarray, time_step : float, window : float) -> tuple:
         # get window window size
         if window is None:
             warp_window = None
         else:
             warp_window = int(window / time_step)
 
-        path = dtw.warping_path(stats.zscore(target_timeseries), stats.zscore(reference_timeseries), window = warp_window)
+        path = dtw.warping_path(stats.zscore(reference_timeseries), stats.zscore(target_timeseries), window = warp_window)
 
-        warped_timeseries, _ = dtw.warp(target_timeseries, reference_timeseries, path)
+        warped_timeseries, _ = dtw.warp(reference_timeseries, target_timeseries, path)
 
         return np.array(warped_timeseries), 
 

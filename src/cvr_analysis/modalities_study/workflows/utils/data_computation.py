@@ -11,7 +11,7 @@ from sklearn.feature_selection import mutual_info_regression
 from nilearn import maskers
 from scipy.ndimage import median_filter, uniform_filter
 from nilearn import image
-from pyppca import ppca
+from sklearn.decomposition import PCA
 
 class BaselinePlateau(ProcessNode):
     """
@@ -105,6 +105,9 @@ class PercentageChangeTimeSeries(ProcessNode):
     outputs = ("percentage_timeseries", "baseline_timeseries")
 
     def _run(self, timeseries : np.ndarray, baseline : np.ndarray,) -> tuple:
+        # return if none
+        if timeseries is None:
+            return None, None
         # mask
         mask = np.logical_or(np.isclose(baseline,0), baseline < 0)
         baseline_with_nan = np.where(mask, np.nan, baseline)
@@ -125,8 +128,10 @@ class StandardizeTimeSeries(ProcessNode):
     outputs = ("standardized_timeseries", )
 
     def _run(self, timeseries : np.ndarray) -> tuple:
+        # return if none
+        if timeseries is None:
+            return None
         # check stategy
-    
         return (timeseries - timeseries.mean(axis = 0)) / timeseries.std(axis = 0), 
 
 class RMSTimeSeries(ProcessNode):
@@ -332,11 +337,11 @@ class FilterTimeshifts(ProcessNode):
     outputs = ("filtered_timeshifts",)
 
     def _run(self, timeseries_masker : maskers.NiftiMasker, timeshifts : np.ndarray, maxcorrs : float, maxcorr_threshold : float = 0.5, size : int = 3, filter_type : str = 'median') -> tuple:
-        # copy data
-        new_timeshifts = timeshifts.copy()
         # check if None
         if filter_type is None:
-            return new_timeshifts
+            return timeshifts
+        # copy data
+        new_timeshifts = timeshifts.copy()
         # convert to img
         new_timeshifts_img = timeseries_masker.inverse_transform(new_timeshifts)
         # check filter type
@@ -364,31 +369,12 @@ class PCAReducedTimeSeries(ProcessNode):
     def _run(self, timeseries : np.ndarray, explained_variance : float = 0.5) -> tuple:
         # assert explained variance in between 0 and 1
         assert explained_variance > 0 and explained_variance < 1, f"'explained_variance' needs to be between 0 and 1"
+        # create PCA solver
+        pca = PCA(n_components=explained_variance)
         # apply pca
-        Y = timeseries.T
-        # iterate to make sure explained variance is explained
-        nr_components = 2
-        while nr_components < Y.shape[1]:
-            C, ss, M, X, Ye = ppca(Y, nr_components, False)
-            exp_var = self.explainedVarianceRatio(Ye, X, C, M)
-            if np.sum(exp_var) < explained_variance:
-                nr_components += 1
-            else:
-                break
-        # transform
-        Y_avg_reduced = X @ C.T + M
+        reduced_timeseries = pca.inverse_transform(pca.fit_transform(timeseries.T)).T
 
-        return Y_avg_reduced.T, C, exp_var
-
-    def explainedVarianceRatio(self, Y, X, C, M):
-        result = np.zeros(C.shape[1])
-        for ii in range(C.shape[1]):
-            X_ii = np.zeros_like(X)
-            X_ii[:, ii] = X[:, ii]
-            Y_approx_ii = X_ii @ C.T + M 
-
-            result[ii] = 1 - (np.linalg.norm(Y_approx_ii - Y) / np.linalg.norm(Y - M)) ** 2
-        return result
+        return reduced_timeseries, pca.components_, pca.explained_variance_ratio_
 
 class AlignTimeSeries(ProcessNode):
     outputs = ("aligned_timeseries",)

@@ -5,9 +5,12 @@ from nilearn import glm
 
 
 class MotionConfounds(ProcessNode):
-    outputs = ("motion_confounds_df", )
+    outputs = ("motion_confounds_df", "motion_confound_names")
     
     def _run(self, confounds_df : pd.DataFrame, derivatives : bool = True, powers : bool = True) -> tuple:
+        # return if false
+        if confounds_df is None:
+            return None, None
         # determine which confounds to include
         include = [""]
         if derivatives:
@@ -26,4 +29,4 @@ class MotionConfounds(ProcessNode):
 
         confound_selected = confounds_df.loc[:,confound_names]
 
-        return confound_selected, 
+        return confound_selected, confound_selected.columns

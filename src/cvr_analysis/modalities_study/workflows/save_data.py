@@ -20,13 +20,13 @@ def createHashCheckOverride(
                                 voxel_mask, roi_masker, spatial_smoothing_fwhm, 
                                     analysis_start_time, analysis_end_time, min_sample_freq, 
                                         detrend_linear_order, temporal_filter_freq, 
-                                            baseline_strategy, use_co2_regressor, confound_regressor_correlation_threshold,
-                                                initial_global_align_lower_bound, initial_global_align_upper_bound,
+                                            baseline_strategy, use_co2_regressor, include_confounds, confound_regressor_correlation_threshold,
+                                                global_align_co2_lower_bound, global_align_co2_upper_bound,
                                                     maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, 
                                                         correlation_window, correlation_multi_peak_strategy,
                                                             filter_timeshifts_correlation_threshold, filter_timeshifts_size, filter_timeshifts_filter_type,
                                                                 refine_regressor_correlation_threshold, refine_regressor_nr_recursions, refine_regressor_explained_variance,
-                                                                    ensure_co2_units, 
+                                                                    do_dtw, 
                                                                         force_run = False): 
     # folder for files
     analysis_name = "cvr-analysis-modalities-" + __version__ 
@@ -49,8 +49,9 @@ def createHashCheckOverride(
     if detrend_linear_order is not None and int(detrend_linear_order) == 0:
         detrend_linear_order = None
 
-    # do dynamic time warping
-    do_dtw = ensure_co2_units and (~use_co2_regressor or refine_regressor_nr_recursions > 0)
+    # check if include confounds, if not change threshold
+    if not include_confounds:
+        confound_regressor_correlation_threshold = None
    
     # analysis info
     analysis_info = {
@@ -64,7 +65,7 @@ def createHashCheckOverride(
         "temporal-filter-freq"                      : try_conv(temporal_filter_freq, float),
         "baseline-strategy"                         : try_conv(baseline_strategy, str),
         "use-co2-regressor"                         : bool(use_co2_regressor),
-        "initial-global-align-bounds"               : try_conv((initial_global_align_lower_bound, initial_global_align_upper_bound), float),
+        "initial-global-align-bounds"               : try_conv((global_align_co2_lower_bound, global_align_co2_upper_bound), float),
         "align-regressor-bounds"                    : try_conv((align_regressor_lower_bound, align_regressor_upper_bound), float),
         "maxcorr-bipolar"                           : bool(maxcorr_bipolar),
         "correlation-window"                        : try_conv(correlation_window, str),
@@ -76,6 +77,7 @@ def createHashCheckOverride(
         "refine-regressor-correlation-threshold"    : try_conv(refine_regressor_correlation_threshold, float),
         "refine-regressor-explained-variance"       : try_conv(refine_regressor_explained_variance, float),
         "dynamic-time-warping"                      : bool(do_dtw),
+        "include-confounds"                         : bool(include_confounds),
         "confound-regressor-correlation-threshold"  : try_conv(confound_regressor_correlation_threshold, float),
     }
 

@@ -1,5 +1,5 @@
 # %%
-from process_control import ProcessWorkflow, ConditionalNode
+from process_control import ProcessWorkflow, ConditionalNode, ValueNode, _and_, _or_, not_
 from cvr_analysis.modalities_study.workflows.post_processing import post_processing_wf
 from cvr_analysis.modalities_study.workflows.regression import regression_wf
 from cvr_analysis.modalities_study.workflows.save_data import create_hash_check_override, conditionally_save_data
@@ -13,10 +13,10 @@ cvr_analysis_wf = ProcessWorkflow(
         # post-processing
         (ProcessWorkflow.input._, post_processing_wf.input.all),
         # regression 
-        (ProcessWorkflow.input._, regression_wf.input[('baseline_strategy', 'use_co2_regressor', 'initial_global_align_lower_bound', 'initial_global_align_upper_bound', 'correlation_window', 'correlation_phat', 'correlation_multi_peak_strategy', 'align_regressor_lower_bound', 'align_regressor_upper_bound', 'nr_parallel_processes', 'show_pbar', 'maxcorr_bipolar', 'filter_timeshifts_correlation_threshold', 'filter_timeshifts_size', 'filter_timeshifts_filter_type', 'refine_regressor_correlation_threshold', 'refine_regressor_nr_recursions', 'refine_regressor_explained_variance', 'ensure_co2_units', 'confound_regressor_correlation_threshold')]),
-        (post_processing_wf.output.temporal_filtered_detrended_up_sampled_bold_timeseries, regression_wf.input.bold_timeseries),
-        (post_processing_wf.output.temporal_filtered_detrended_up_sampled_co2_timeseries, regression_wf.input.co2_timeseries),
-        (post_processing_wf.output.temporal_filtered_detrended_up_sampled_confounds_df, regression_wf.input.confounds_df),
+        (ProcessWorkflow.input._, regression_wf.input[('baseline_strategy', 'use_co2_regressor', 'correlation_window', 'correlation_phat', 'correlation_multi_peak_strategy', 'align_regressor_lower_bound', 'align_regressor_upper_bound', 'nr_parallel_processes', 'show_pbar', 'maxcorr_bipolar', 'filter_timeshifts_correlation_threshold', 'filter_timeshifts_size', 'filter_timeshifts_filter_type', 'refine_regressor_correlation_threshold', 'refine_regressor_nr_recursions', 'refine_regressor_explained_variance', 'do_dtw', 'confound_regressor_correlation_threshold')]),
+        (post_processing_wf.output.temporal_filtered_detrended_time_limited_up_sampled_bold_timeseries, regression_wf.input.bold_timeseries),
+        (post_processing_wf.output.temporal_filtered_detrended_time_limited_global_aligned_up_sampled_co2_timeseries, regression_wf.input.co2_timeseries),
+        (post_processing_wf.output.temporal_filtered_detrended_time_limited_up_sampled_confounds_df, regression_wf.input.confounds_df),
         (post_processing_wf.output.up_sampling_factor, regression_wf.input.down_sampling_factor),
         (post_processing_wf.output.up_sampled_sample_time, regression_wf.input.sample_time),
         (post_processing_wf.output.timeseries_masker, regression_wf.input.timeseries_masker),
@@ -78,15 +78,17 @@ conditional_run_cvr = ConditionalNode("run_analysis", {True : cvr_analysis_wf, F
 cvr_wf = ProcessWorkflow(
     (
         # create hash check override
-        (ProcessWorkflow.input._, create_hash_check_override.input.all),
+        (ProcessWorkflow.input._, create_hash_check_override.input.all / create_hash_check_override.input.do_dtw),
         (create_hash_check_override.output.analysis_id, ProcessWorkflow.output.analysis_id),
         # conditional run
-        (ProcessWorkflow.input._, conditional_run_cvr.input.all / conditional_run_cvr.input[("run_analysis", "analysis_file", "analysis_dict")]),
+        (ProcessWorkflow.input._, conditional_run_cvr.input.all / conditional_run_cvr.input[("run_analysis", "analysis_file", "analysis_dict", "do_dtw")]),
         (create_hash_check_override.output.run_analysis, conditional_run_cvr.input.run_analysis),
         (create_hash_check_override.output.analysis_file, conditional_run_cvr.input.analysis_file),
         (create_hash_check_override.output.analysis_dict, conditional_run_cvr.input.analysis_dict),
-        (conditional_run_cvr.output.all, ProcessWorkflow.output._)
+        (conditional_run_cvr.output.all, ProcessWorkflow.output._),
+        # do dtw
+        (ProcessWorkflow.input.ensure_co2_units *_and_* (not_*ProcessWorkflow.input.use_co2_regressor *_or_* ProcessWorkflow.input.refine_regressor_nr_recursions > ValueNode(0).output.value), (create_hash_check_override.input.do_dtw, conditional_run_cvr.input.do_dtw)),
     ),
     "cvr wf"
-)
+).setDefaultInputs(ensure_co2_units = True)
 # %%

@@ -188,10 +188,10 @@ def main():
     else:
         co2_options = args.use_co2_regressor
     # initial global align bounds
-    if args.initial_global_align_bounds is None:
-        initial_global_align_bounds_options = [(None, None)]
+    if args.global_align_co2_bounds is None:
+        global_align_co2_bounds_options = [(None, None)]
     else:
-        initial_global_align_bounds_options = args.initial_global_align_bounds
+        global_align_co2_bounds_options = args.global_align_co2_bounds
     # align regressor bounds
     if args.align_regressor_bounds is None:
         align_regressor_bounds_options = [(None, None)]
@@ -275,7 +275,7 @@ def main():
         "temporal-filter-freq" : temporal_filter_freq_options,
         "baseline-strategy" : baseline_strategy_options,
         "use-co2-regressor" : co2_options,
-        "initial-global-align-bounds" : initial_global_align_bounds_options,
+        "initial-global-align-bounds" : global_align_co2_bounds_options,
         "align-regressor-bounds" : align_regressor_bounds_options,
         "maxcorr-bipolar" : bipolar_options,
         "correlation-window" : correlation_window_options,
@@ -386,8 +386,8 @@ def main():
             iter_args_dict["align_regressor_lower_bound"], iter_args_dict["align_regressor_upper_bound"] = iter_args_dict["align_regressor_bounds"]
             del iter_args_dict["align_regressor_bounds"]
             # unpack initial global align bounds
-            iter_args_dict["initial_global_align_lower_bound"], iter_args_dict["initial_global_align_upper_bound"] = iter_args_dict["initial_global_align_bounds"]
-            del iter_args_dict["initial_global_align_bounds"]
+            iter_args_dict["global_align_co2_lower_bound"], iter_args_dict["global_align_co2_upper_bound"] = iter_args_dict["global_align_co2_bounds"]
+            del iter_args_dict["global_align_co2_bounds"]
 
             # print args if verbose
             if args.verbose:
