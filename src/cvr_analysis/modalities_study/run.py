@@ -91,6 +91,8 @@ def main():
     parser.add_argument('--correlation-window', type=partial(handleNone, str), action="extend", nargs="+", help='correlation window')
     # correlation multi peak
     parser.add_argument('--correlation-multi-peak-strategy', type=partial(handleNone, str), action="extend", nargs="+", help='strategy to decide between multiple peaks in the cross-correlation function, either "ref", "max" or "mi"')
+    # correlation peak threshold
+    parser.add_argument('--correlation-peak-threshold', type=partial(handleNone, float), action="extend", nargs="+", help='threshold for peak detection in correlation function')
     # filter timeshifts type
     parser.add_argument('--filter-timeshifts-filter-type', type=partial(handleNone, str), action="extend", nargs="+", help='type of filter, either "mean", "median" or "None"')
     # filter timeshifts size
@@ -212,6 +214,11 @@ def main():
         correlation_multi_peak_strategy_options = [None]
     else:
         correlation_multi_peak_strategy_options = args.correlation_multi_peak_strategy
+    # correlation multi peak
+    if args.correlation_peak_threshold is None:
+        correlation_peak_threshold_options = [0.0]
+    else:
+        correlation_peak_threshold_options = args.correlation_peak_threshold
     # filter timeshifts type
     if args.filter_timeshifts_filter_type is None:
         filter_timeshifts_filter_type_options = [None]
@@ -280,6 +287,7 @@ def main():
         "maxcorr-bipolar" : bipolar_options,
         "correlation-window" : correlation_window_options,
         "correlation-multi-peak-strategy"           : correlation_multi_peak_strategy_options,
+        "correlation-peak-threshold"                : correlation_peak_threshold_options,
         "filter-timeshifts-filter-type"             : filter_timeshifts_filter_type_options,
         "filter-timeshifts-size"                    : filter_timeshifts_size_options,
         "filter-timeshifts-smooth-fwhm"             : filter_timeshifts_smooth_fwhm_options,
