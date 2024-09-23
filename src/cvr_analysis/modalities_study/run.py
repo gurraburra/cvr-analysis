@@ -298,7 +298,7 @@ def main():
         parameter_list = pd.read_csv(args.parameter_list_file, sep='\t')
         # check all parameters are in options
         for c in parameter_list.columns:
-            assert c in options, f"Parameter '{c}' is not a valid option."
+            assert c in options, f"Parameter '{c}' is not a valid option: {' ,'.join(ordered_factors)}"
         # check before conversion
         def applyLiteralEvalStr(val):
             if isinstance(val, str):

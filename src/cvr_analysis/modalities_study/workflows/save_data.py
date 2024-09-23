@@ -23,7 +23,7 @@ def createHashCheckOverride(
                                             baseline_strategy, use_co2_regressor, include_confounds, confound_regressor_correlation_threshold,
                                                 global_align_co2_lower_bound, global_align_co2_upper_bound,
                                                     maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, 
-                                                        correlation_window, correlation_multi_peak_strategy,
+                                                        correlation_window, correlation_multi_peak_strategy, correlation_peak_threshold,
                                                              filter_timeshifts_size, filter_timeshifts_filter_type, filter_timeshifts_smooth_fwhm,
                                                                 refine_regressor_correlation_threshold, refine_regressor_nr_recursions, refine_regressor_explained_variance,
                                                                     do_dtw, 
@@ -58,6 +58,10 @@ def createHashCheckOverride(
         refine_regressor_nr_recursions = 0
         refine_regressor_explained_variance = None
         refine_regressor_correlation_threshold = None
+
+    # check if refining regressor, if not change parameters
+    if correlation_multi_peak_strategy is None:
+        correlation_peak_threshold = None
    
     # analysis info
     analysis_info = {
@@ -76,6 +80,7 @@ def createHashCheckOverride(
         "maxcorr-bipolar"                           : bool(maxcorr_bipolar),
         "correlation-window"                        : try_conv(correlation_window, str),
         "correlation-multi-peak-strategy"           : try_conv(correlation_multi_peak_strategy, str),
+        "correlation-peak-threshold"                : try_conv(correlation_peak_threshold, float),
         "filter-timeshifts-filter-type"             : try_conv(filter_timeshifts_filter_type, str),
         "filter-timeshifts-smooth-fwhm"             : try_conv(filter_timeshifts_smooth_fwhm, float),
         "filter-timeshifts-size"                    : try_conv(filter_timeshifts_size, int),
