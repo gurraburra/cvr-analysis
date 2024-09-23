@@ -24,7 +24,7 @@ def createHashCheckOverride(
                                                 global_align_co2_lower_bound, global_align_co2_upper_bound,
                                                     maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, 
                                                         correlation_window, correlation_multi_peak_strategy,
-                                                            filter_timeshifts_correlation_threshold, filter_timeshifts_size, filter_timeshifts_filter_type,
+                                                             filter_timeshifts_size, filter_timeshifts_filter_type, filter_timeshifts_smooth_fwhm,
                                                                 refine_regressor_correlation_threshold, refine_regressor_nr_recursions, refine_regressor_explained_variance,
                                                                     do_dtw, 
                                                                         force_run = False): 
@@ -52,6 +52,12 @@ def createHashCheckOverride(
     # check if include confounds, if not change threshold
     if not include_confounds:
         confound_regressor_correlation_threshold = None
+
+    # check if refining regressor, if not change parameters
+    if refine_regressor_nr_recursions <= 0:
+        refine_regressor_nr_recursions = 0
+        refine_regressor_explained_variance = None
+        refine_regressor_correlation_threshold = None
    
     # analysis info
     analysis_info = {
@@ -71,12 +77,12 @@ def createHashCheckOverride(
         "correlation-window"                        : try_conv(correlation_window, str),
         "correlation-multi-peak-strategy"           : try_conv(correlation_multi_peak_strategy, str),
         "filter-timeshifts-filter-type"             : try_conv(filter_timeshifts_filter_type, str),
-        "filter-timeshifts-correlation-threshold"   : try_conv(filter_timeshifts_correlation_threshold, float),
+        "filter-timeshifts-smooth-fwhm"             : try_conv(filter_timeshifts_smooth_fwhm, float),
         "filter-timeshifts-size"                    : try_conv(filter_timeshifts_size, int),
         "refine-regressor-nr-recursions"            : try_conv(refine_regressor_nr_recursions, int),
         "refine-regressor-correlation-threshold"    : try_conv(refine_regressor_correlation_threshold, float),
         "refine-regressor-explained-variance"       : try_conv(refine_regressor_explained_variance, float),
-        "dynamic-time-warping"                      : bool(do_dtw),
+        "dtw-to-ensure-co2-units"                   : bool(do_dtw),
         "include-confounds"                         : bool(include_confounds),
         "confound-regressor-correlation-threshold"  : try_conv(confound_regressor_correlation_threshold, float),
     }
@@ -133,7 +139,7 @@ def saveData(
             timeseries_masker.inverse_transform(bold_predictions.T).to_filename(preamble + "desc-predictions_bold.nii.gz")
         # 3D data
         timeseries_masker.inverse_transform(bold_cvr_amplitude).to_filename(preamble + "desc-cvrAmplitude_map.nii.gz")
-        timeseries_masker.inverse_transform(bold_timeshift_maxcorr - reference_regressor_timeshift).to_filename(preamble + "desc-cvrTimeshift_map.nii.gz")
+        timeseries_masker.inverse_transform(bold_timeshift_maxcorr).to_filename(preamble + "desc-cvrTimeshift_map.nii.gz")
         timeseries_masker.inverse_transform(bold_tsnr).to_filename(preamble + "desc-tsnr_map.nii.gz")
         timeseries_masker.inverse_transform(bold_r_squared).to_filename(preamble + "desc-rSquared_map.nii.gz")
         timeseries_masker.inverse_transform(bold_maxcorr).to_filename(preamble + "desc-maxCorr_map.nii.gz")

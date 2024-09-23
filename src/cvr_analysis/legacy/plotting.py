@@ -59,10 +59,25 @@ class IMGShow:
             self.axial_ax.imshow(self.voxel_mask[:,:,self.pos[2]].T, cmap = 'Greys', aspect = self.settings["aspect"], origin = self.settings["origin"], interpolation = 'nearest')
         # plot ax
         for data, label in self.plot_data:
+            if isinstance(data, tuple):
+                times, data = data
+            else:
+                times = None
             if data.ndim == 1:
-                self.plot_ax.plot(data, label = label)
+                if times is None:
+                    self.plot_ax.plot(data, label = label)
+                else:
+                    self.plot_ax.plot(times, data, label = label)
+            elif data.ndim == 3:
+                if times is None:
+                    self.plot_ax.axvline(data[self.pos[0], self.pos[1], self.pos[2]], label = label)
+                else:
+                    raise ValueError("Time cannot be defined fore 3D data")
             elif data.ndim == 4:
-                self.plot_ax.plot(data[self.pos[0], self.pos[1], self.pos[2]], label = label)
+                if times is None:
+                    self.plot_ax.plot(data[self.pos[0], self.pos[1], self.pos[2]], label = label)
+                else:
+                    self.plot_ax.plot(times, data[self.pos[0], self.pos[1], self.pos[2]], label = label)
             else:
                 raise ValueError("Incorrect dimensions")
         self.plot_ax.legend(loc = "lower left", title = f"val: {self.img[self.pos[0],self.pos[1],self.pos[2]]:.2f}")
@@ -117,7 +132,7 @@ def maxMinNorn(sig):
 
 norm_funcs = {"stand" : stand, "maxMinNorm" : maxMinNorn}
 
-def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', norm : str = "maxMinNorm", **custom_settings):
+def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', norm : str = "maxMinNorm", data_include = "bold+regressor+predictions", **custom_settings):
     # settings
     settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower", 'interpolation' : 'antialiased'}
     settings.update(custom_settings)
@@ -136,24 +151,47 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', norm :
     cvr_img_masked = cvr_data #  np.ma.masked_where(cvr_mask, cvr_data)
     # data
     data = []
+    # spit data include
+    data_include = data_include.split("+")
+    # get timeshift data
+    if "timeshift" in data_include:
+        try:
+            tshift_img = image.load_img(os.path.join(folder, preamble + "_desc-cvrTimeshift_map.nii.gz"))
+            data.append((tshift_img.get_fdata(), "timeshift"))
+        except:
+            print("No bold img found")
     # get bold data
-    try:
-        bold_img = image.load_img(os.path.join(folder, preamble + "_desc-preproc_bold.nii.gz"))
-        data.append((norm_func(bold_img.get_fdata()), "bold"))
-    except:
-        print("No bold img found")
+    if "bold" in data_include:
+        try:
+            bold_img = image.load_img(os.path.join(folder, preamble + "_desc-preproc_bold.nii.gz"))
+            data.append((norm_func(bold_img.get_fdata()), "bold"))
+        except:
+            print("No bold img found")
     # get aligned regressor data
-    try:
-        regressor_img = image.load_img(os.path.join(folder, preamble + "_desc-alignedRegressor_map.nii.gz"))
-        data.append((norm_func(regressor_img.get_fdata()), "regressor"))
-    except:
-        print("No regressor img found")
+    if "regressor" in data_include:
+        try:
+            regressor_img = image.load_img(os.path.join(folder, preamble + "_desc-alignedRegressor_map.nii.gz"))
+            data.append((norm_func(regressor_img.get_fdata()), "regressor"))
+        except:
+            print("No regressor img found")
     # get predictions
-    try:
-        predictions_img = image.load_img(os.path.join(folder, preamble + "_desc-predictions_bold.nii.gz"))
-        data.append((norm_func(predictions_img.get_fdata()), "prediction"))
-    except:
-        print("No prediction img found")
+    if "predictions" in data_include:
+        try:
+            predictions_img = image.load_img(os.path.join(folder, preamble + "_desc-predictions_bold.nii.gz"))
+            data.append((norm_func(predictions_img.get_fdata()), "prediction"))
+        except:
+            print("No prediction img found")
+    # get predictions
+    if "correlations" in data_include:
+        try:
+            correlations_img = image.load_img(os.path.join(folder, preamble + "_desc-correlations_map.nii.gz"))
+            with open(os.path.join(folder, preamble + "_desc-data_info.json"), "r") as file:
+                data_info = json.load(file)
+            times = np.arange(0, correlations_img.shape[3]) * data_info["align-regressor-time-step"] + data_info["align-regressor-start-time"]
+	        
+            data.append(((times, norm_func(correlations_img.get_fdata())), "x-correlation"))
+        except:
+            print("No correlation img found")
     # get voxel mask
     try:
         with open(os.path.join(folder, preamble + "_desc-data_info.json"), "r") as file:

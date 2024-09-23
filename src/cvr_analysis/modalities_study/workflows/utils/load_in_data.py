@@ -20,12 +20,12 @@ def _isNiftiFile(desc):
     else:
         return desc
     
-def _getBIDSFiles(bids_dir, subject, session=None, task=None, run=None, space=None, desc=None, suffix=None, extension=None):
+def _getBIDSFiles(bids_directory, subject, session=None, task=None, run=None, space=None, desc=None, suffix=None, extension=None):
     # base dir
     if session is None:
-        base_dir = os.path.join(bids_dir, f"sub-{subject}", "*")
+        base_dir = os.path.join(bids_directory, f"sub-{subject}", "*")
     else:
-        base_dir = os.path.join(bids_dir, f"sub-{subject}", f"ses-{session}", "*")
+        base_dir = os.path.join(bids_directory, f"sub-{subject}", f"ses-{session}", "*")
     # file specification
     file_spec = f"sub-{subject}"
     # add optional specifyers
@@ -59,12 +59,12 @@ def _getBIDSFiles(bids_dir, subject, session=None, task=None, run=None, space=No
 class LoadBOLDData(ProcessNode):
     outputs = ("bold_img", "confounds_df", "events_df", "tr", "nr_measurements")
     
-    def _run(self, bids_dir : str, subject : str = None, session : str = None, task : str = None, run : str = None, space : str = None, load_confounds : bool = False, load_events : bool = True) -> dict:
+    def _run(self, bids_directory : str, subject : str = None, session : str = None, task : str = None, run : str = None, space : str = None, load_confounds : bool = False, load_events : bool = True) -> dict:
         # load bild data
         bold_img = image.load_img(
                         _checkBIDSQuery("BOLD", 
                             _getBIDSFiles(
-                                        bids_dir,
+                                        bids_directory,
                                             subject=subject, 
                                                 session=session, 
                                                     task=task, 
@@ -77,7 +77,7 @@ class LoadBOLDData(ProcessNode):
 
         bold_json_file = _checkBIDSQuery("BOLD JSON", 
                             _getBIDSFiles(
-                                        bids_dir,
+                                        bids_directory,
                                             subject=subject, 
                                                 session=session, 
                                                     task=task, 
@@ -87,7 +87,7 @@ class LoadBOLDData(ProcessNode):
                                                                     extension=".json"))
     
         # tr
-        # tr = bids_dir.get_metadata(bold_img.get_filename())["RepetitionTime"]
+        # tr = bids_directory.get_metadata(bold_img.get_filename())["RepetitionTime"]
         with open(bold_json_file, "r") as file:
             tr = json.load(file)["RepetitionTime"]
         
@@ -96,7 +96,7 @@ class LoadBOLDData(ProcessNode):
             confounds_df = pd.read_csv(
                                 _checkBIDSQuery("confounds", 
                                     _getBIDSFiles(
-                                        bids_dir,
+                                        bids_directory,
                                             subject=subject, 
                                                 session=session, 
                                                     task=task, 
@@ -111,7 +111,7 @@ class LoadBOLDData(ProcessNode):
             events_df = pd.read_csv(
                                 _checkBIDSQuery("events", 
                                      _getBIDSFiles(
-                                        bids_dir, 
+                                        bids_directory, 
                                             subject=subject, 
                                                 session=session, 
                                                     task=task, 
@@ -129,7 +129,7 @@ class LoadBOLDData(ProcessNode):
 class LoadBidsImg(ProcessNode):
     outputs = ("bids_img", )
     
-    def _run(self, bids_dir : str, subject : str = None, session : str = None, task : str = None, run : str = None, space : str = None, desc : str = None, suffix : str = None) -> dict:
+    def _run(self, bids_directory : str, subject : str = None, session : str = None, task : str = None, run : str = None, space : str = None, desc : str = None, suffix : str = None) -> dict:
         # check if is nifti file
         if _isNiftiFile(desc):
             bids_file = desc
@@ -137,7 +137,7 @@ class LoadBidsImg(ProcessNode):
             # if not, assume it is a description
             bids_file = _checkBIDSQuery(suffix, 
                          _getBIDSFiles(
-                            bids_dir, 
+                            bids_directory, 
                                 subject=subject, 
                                     session=session, 
                                         task=task, 

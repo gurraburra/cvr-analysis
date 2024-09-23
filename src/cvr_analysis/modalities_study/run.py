@@ -82,7 +82,7 @@ def main():
     # use co2 regressor
     parser.add_argument('--use-co2-regressor', type=handleBool, action="extend", nargs="+", help='use co2 regressor')
     # initial global align bounds
-    parser.add_argument('--initial-global-align-bounds', type=partial(handleTuple, float), action="extend", nargs="+", help='pair of lower and upper bounds for initial aligning regressor to global signal (in seconds)')
+    parser.add_argument('--global-align-co2-bounds', type=partial(handleTuple, float), action="extend", nargs="+", help='pair of lower and upper bounds for initial aligning regressor to global signal (in seconds)')
     # align regressor bounds
     parser.add_argument('--align-regressor-bounds', type=partial(handleTuple, float), action="extend", nargs="+", help='pair of lower and upper bounds for aligning regressor (in seconds)')
     # bipolar correlation
@@ -93,10 +93,10 @@ def main():
     parser.add_argument('--correlation-multi-peak-strategy', type=partial(handleNone, str), action="extend", nargs="+", help='strategy to decide between multiple peaks in the cross-correlation function, either "ref", "max" or "mi"')
     # filter timeshifts type
     parser.add_argument('--filter-timeshifts-filter-type', type=partial(handleNone, str), action="extend", nargs="+", help='type of filter, either "mean", "median" or "None"')
-    # filter timeshifts threshold
-    parser.add_argument('--filter-timeshifts-correlation-threshold', type=partial(handleNone, float), action="extend", nargs="+", help='upper correlation threshold for voxels to apply filter to')
     # filter timeshifts size
-    parser.add_argument('--filter-timeshifts-size', type=partial(handleNone, int), action="extend", nargs="+", help='size of correlation window in voxels')
+    parser.add_argument('--filter-timeshifts-size', type=partial(handleNone, int), action="extend", nargs="+", help='size of filter window (in voxels) used in filtering of timeshifts')
+    # filter timeshifts smoothing fwhm
+    parser.add_argument('--filter-timeshifts-smooth-fwhm', type=partial(handleNone, float), action="extend", nargs="+", help='fwhm smoothing of timeshifts')
     # refine regressor nr recursions
     parser.add_argument('--refine-regressor-nr-recursion', type=partial(handleNone, int), action="extend", nargs="+", help='refine regressor nr recursions')
     # refine regressor threshold
@@ -187,7 +187,7 @@ def main():
         co2_options = [True]
     else:
         co2_options = args.use_co2_regressor
-    # initial global align bounds
+    # global align co2 bounds
     if args.global_align_co2_bounds is None:
         global_align_co2_bounds_options = [(None, None)]
     else:
@@ -217,16 +217,16 @@ def main():
         filter_timeshifts_filter_type_options = [None]
     else:
         filter_timeshifts_filter_type_options = args.filter_timeshifts_filter_type
-    # filter timeshifts threshold
-    if args.filter_timeshifts_correlation_threshold is None:
-        filter_timeshifts_correlation_threshold_options = [1.0]
-    else:
-        filter_timeshifts_correlation_threshold_options = args.filter_timeshifts_correlation_threshold
     # filter timeshifts size
     if args.filter_timeshifts_size is None:
         filter_timeshifts_size_options = [3]
     else:
         filter_timeshifts_size_options = args.filter_timeshifts_size
+    # filter timeshifts smooth fwhm
+    if args.filter_timeshifts_smooth_fwhm is None:
+        filter_timeshifts_smooth_fwhm_options = [None]
+    else:
+        filter_timeshifts_smooth_fwhm_options = args.filter_timeshifts_smooth_fwhm
     # refine regressor nr recursions
     if args.refine_regressor_nr_recursion is None:
         refine_regressor_nr_recursion_options = [0]
@@ -275,14 +275,14 @@ def main():
         "temporal-filter-freq" : temporal_filter_freq_options,
         "baseline-strategy" : baseline_strategy_options,
         "use-co2-regressor" : co2_options,
-        "initial-global-align-bounds" : global_align_co2_bounds_options,
+        "global-align-co2-bounds" : global_align_co2_bounds_options,
         "align-regressor-bounds" : align_regressor_bounds_options,
         "maxcorr-bipolar" : bipolar_options,
         "correlation-window" : correlation_window_options,
         "correlation-multi-peak-strategy"           : correlation_multi_peak_strategy_options,
         "filter-timeshifts-filter-type"             : filter_timeshifts_filter_type_options,
-        "filter-timeshifts-correlation-threshold"   : filter_timeshifts_correlation_threshold_options,
         "filter-timeshifts-size"                    : filter_timeshifts_size_options,
+        "filter-timeshifts-smooth-fwhm"             : filter_timeshifts_smooth_fwhm_options,
         "refine-regressor-nr-recursions"            : refine_regressor_nr_recursion_options,
         "refine-regressor-correlation-threshold"    : refine_regressor_correlation_threshold_options,
         "refine-regressor-explained-variance"       : refine_regressor_explained_variance_options,
@@ -306,7 +306,7 @@ def main():
             else:
                 return val
         # handle conversion
-        converters={"initial-global-align-bounds": applyLiteralEvalStr, "align-regressor-bounds": applyLiteralEvalStr, "analysis-bounds": applyLiteralEvalStr, "temporal-filter-freq": applyLiteralEvalStr}
+        converters={"global-align-co2-bounds": applyLiteralEvalStr, "align-regressor-bounds": applyLiteralEvalStr, "analysis-bounds": applyLiteralEvalStr, "temporal-filter-freq": applyLiteralEvalStr}
         for c_name, func in converters.items():
             if c_name in parameter_list.columns:
                 parameter_list[c_name] = parameter_list[c_name].apply(func)
@@ -398,7 +398,7 @@ def main():
 
             # run workflow
             cvr_wf.run(ignore_cache = False, save_data = True, nr_parallel_processes = nprocs,
-                                bids_directory = args.bids_dir, verbose = args.verbose, force_run = args.force_run, full_output = args.full_output, output_directory = args.output_dir, 
+                                bids_dir = args.bids_dir, verbose = args.verbose, force_run = args.force_run, full_output = args.full_output, output_directory = args.output_dir, 
                                         **iter_args_dict)
 
     # done
