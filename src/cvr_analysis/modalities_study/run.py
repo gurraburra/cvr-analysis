@@ -296,13 +296,13 @@ def main():
         "correlation-window" : correlation_window_options,
         "correlation-multi-peak-strategy"           : correlation_multi_peak_strategy_options,
         "correlation-peak-threshold"                : correlation_peak_threshold_options,
-        "filter-timeshifts-filter-type"             : filter_timeshifts_filter_type_options,
-        "filter-timeshifts-size"                    : filter_timeshifts_size_options,
-        "filter-timeshifts-smooth-fwhm"             : filter_timeshifts_smooth_fwhm_options,
+        "ensure-co2-units"                          : ensure_co2_units_options,
         "refine-regressor-nr-recursions"            : refine_regressor_nr_recursion_options,
         "refine-regressor-correlation-threshold"    : refine_regressor_correlation_threshold_options,
         "refine-regressor-explained-variance"       : refine_regressor_explained_variance_options,
-        "ensure-co2-units"                          : ensure_co2_units_options,
+        "filter-timeshifts-filter-type"             : filter_timeshifts_filter_type_options,
+        "filter-timeshifts-size"                    : filter_timeshifts_size_options,
+        "filter-timeshifts-smooth-fwhm"             : filter_timeshifts_smooth_fwhm_options,
         "confound-regressor-correlation-threshold"  : confound_regressor_correlation_thr_options,
     }
 
