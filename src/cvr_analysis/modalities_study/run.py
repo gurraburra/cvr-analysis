@@ -63,6 +63,8 @@ def main():
     parser.add_argument('--run', type=partial(handleNone, str), action="extend", nargs="+", help='which run')
     # space
     parser.add_argument('--space', type=partial(handleNone, str), action="extend", nargs="+", help='which space for analysis')
+    # include confounds
+    parser.add_argument('--include-confounds', type=handleBool, action="extend", nargs="+", help='include confounding variables in analysis')
     # voxel mask
     parser.add_argument('--voxel-mask', type=partial(handleNone, str), action="extend", nargs="+", help='mask for bold data')
     # roi mask
@@ -144,6 +146,11 @@ def main():
         space_options = [None]
     else:
         space_options = args.space
+    # include confounds
+    if args.include_confounds is None:
+        include_confounds_options = [True]
+    else:
+        include_confounds_options = args.include_confounds
     # voxel mask
     if args.voxel_mask is None:
         voxel_mask_options = ["brain"]
@@ -273,6 +280,7 @@ def main():
         "task" : task_options,
         "run" : run_options,
         "space" : space_options,
+        "include-confounds" : include_confounds_options,
         "voxel-mask" : voxel_mask_options,
         "roi-masker" : roi_masker_options,
         "spatial-smoothing-fwhm" : smoothing_fwhm_options,
