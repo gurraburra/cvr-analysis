@@ -25,7 +25,7 @@ SHELL ["mamba", "run", "-n", "cvr", "/bin/bash", "-c"]
 
 # # install cvr analysis
 # WORKDIR /custom-packages/
-# ADD https://api.github.com/repos/gurraburra/cvr-analysis/git/refs/heads/main cvr-analysis-version.json
+ADD https://api.github.com/repos/gurraburra/cvr-analysis/git/refs/heads/main cvr-analysis-version.json
 # RUN git clone --depth 1 https://github.com/gurraburra/cvr-analysis.git
 # WORKDIR /custom-packages/cvr-analysis
 RUN pip install git+https://github.com/gurraburra/cvr-analysis
