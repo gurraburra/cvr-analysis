@@ -173,7 +173,7 @@ global_co2_align_wf = ProcessWorkflow(
         (ProcessWorkflow.input.correlation_phat, global_co2_correlate.input.phat),
         (ValueNode(0.0).output.value, global_co2_correlate.input.peak_threshold),
         (ValueNode("max").output.value, global_co2_correlate.input.multi_peak_strategy),
-        (ValueNode(None).output.value, global_co2_correlate.input.ref_timeshift),
+        (ValueNode(0.0).output.value, global_co2_correlate.input.ref_timeshift),
         (ValueNode(False).output.value, global_co2_correlate.input.bipolar),
         (ProcessWorkflow.input.bold_timeseries.mean(axis = 1) - ProcessWorkflow.input.bold_timeseries.mean() , global_co2_correlate.input.signal_timeseries_a),
         (ProcessWorkflow.input.co2_timeseries - ProcessWorkflow.input.co2_timeseries.mean(), global_co2_correlate.input.signal_timeseries_b),
