@@ -126,7 +126,6 @@ def main():
         raise ValueError("No participant label given.")
     else:
         sub_options = args.participant_label
-        print(sub_options)
     # check session label
     if args.session_label is None:
         ses_options = [None]
