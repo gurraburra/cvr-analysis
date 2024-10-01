@@ -11,6 +11,8 @@ import warnings
 import pandas as pd
 import ast
 import pprint
+import sys
+print(sys.argv)
 
 def handleNone(type_, arg):
     if arg == "None":
