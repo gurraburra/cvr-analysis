@@ -243,7 +243,7 @@ class Correlate(ProcessNode):
                 elif peaks_idx_masked.size == 1:
                     index_masked = peaks_idx_masked[0]
                 else:
-                    fit_status = 0
+                    # fit_status = 0
                     # fit peaks
                     if multi_peak_strategy == 'max':
                         # choose peak with largest value
