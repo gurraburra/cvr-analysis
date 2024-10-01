@@ -11,8 +11,6 @@ import warnings
 import pandas as pd
 import ast
 import pprint
-import sys
-print(sys.argv)
 
 def handleNone(type_, arg):
     if arg == "None":
@@ -315,7 +313,6 @@ def main():
     if args.parameter_list_file is not None:
         # read in parameter list
         parameter_list = pd.read_csv(args.parameter_list_file, sep='\t')
-        print(parameter_list.shape)
         # check all parameters are in options
         for c in parameter_list.columns:
             assert c in options, f"Parameter '{c}' is not a valid option: {' ,'.join(ordered_factors)}"
@@ -332,15 +329,11 @@ def main():
                 parameter_list[c_name] = parameter_list[c_name].apply(func)
         # replace nan with None
         parameter_list = parameter_list.fillna(np.nan).replace([np.nan], [None])
-        print(parameter_list.shape)
         # product options
         product_options = {f : options[f] for f in options if f not in parameter_list.columns}
-        print(product_options)
         product_samples = iter_product(*product_options.values())
-        print(len(tuple(iter_product(*product_options.values()))))
         # create iterations
         iters = np.array([prod + par_list for prod,par_list in iter_product(product_samples, tuple(parameter_list.itertuples(index=False, name=None)))], dtype=object)
-        print(iters.shape)
         # reorder factors
         factor_names = tuple(product_options.keys()) + tuple(parameter_list.columns)
         iters = iters[:,[factor_names.index(factor) for factor in ordered_factors]]
