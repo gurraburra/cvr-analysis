@@ -174,7 +174,7 @@ class DTW(ProcessNode):
     """
     Dynamic time warping.
     """
-    outputs = ("warped_timeseries",)
+    outputs = ("warped_timeseries","warped_path")
 
     def _run(self, reference_timeseries : np.ndarray, target_timeseries : np.ndarray, time_step : float, window : float) -> tuple:
         # get window window size
@@ -187,6 +187,6 @@ class DTW(ProcessNode):
 
         warped_timeseries, _ = dtw.warp(reference_timeseries, target_timeseries, path)
 
-        return np.array(warped_timeseries), 
+        return np.array(warped_timeseries), path
 
     
