@@ -209,8 +209,9 @@ refine_regressor_pca_reduce = PCAReducedTimeSeries(description="refine regressor
 refine_regressor_wf = ProcessWorkflow(
     (
         # find timeshift
-        (ProcessWorkflow.input._, refine_regressor_find_timeshift.input.all / refine_regressor_find_timeshift.input[("filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "timeseries_masker")]),
+        (ProcessWorkflow.input._, refine_regressor_find_timeshift.input.all / refine_regressor_find_timeshift.input[("maxcorr_bipolar", "filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "timeseries_masker")]),
         (ValueNode(None).output.value, refine_regressor_find_timeshift.input[("filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "timeseries_masker")]),
+        (ValueNode(False).output.value, refine_regressor_find_timeshift.input.maxcorr_bipolar),
         # mask timeseries
         (ProcessWorkflow.input.bold_signal_timeseries.T, refine_regressor_mask_timeseries.input.timeseries),
         (refine_regressor_find_timeshift.output.boldIter_maxcorr >= ProcessWorkflow.input.refine_regressor_correlation_threshold, refine_regressor_mask_timeseries.input.mask),
@@ -415,7 +416,7 @@ setup_regression_wf = ProcessWorkflow(
         (signal_timeseries_wf.output.co2_signal_timeseries, choose_regressor.input.co2_signal_timeseries),
         (signal_timeseries_wf.output.global_signal_timeseries, choose_regressor.input.global_signal_timeseries),
         # refine regressor 
-        (ProcessWorkflow.input._, recursively_refine_regressor.input["sample_time", "align_regressor_lower_bound", "align_regressor_upper_bound", 'nr_parallel_processes', 'show_pbar', 'maxcorr_bipolar', 'correlation_window', 'correlation_phat', 'correlation_peak_threshold', 'correlation_multi_peak_strategy', "refine_regressor_correlation_threshold", 'refine_regressor_explained_variance']),
+        (ProcessWorkflow.input._, recursively_refine_regressor.input["sample_time", "align_regressor_lower_bound", "align_regressor_upper_bound", 'nr_parallel_processes', 'show_pbar', 'correlation_window', 'correlation_phat', 'correlation_peak_threshold', 'correlation_multi_peak_strategy', "refine_regressor_correlation_threshold", 'refine_regressor_explained_variance']),
         (ProcessWorkflow.input.refine_regressor_nr_recursions, recursively_refine_regressor.input.nr_recursions),
         (signal_timeseries_wf.output.bold_signal_timeseries, recursively_refine_regressor.input.bold_signal_timeseries),
         (choose_regressor.output.signal_timeseries, recursively_refine_regressor.input.Init_refined_regressor_signal_timeseries),

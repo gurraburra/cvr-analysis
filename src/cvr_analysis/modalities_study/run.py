@@ -91,6 +91,8 @@ def main():
     parser.add_argument('--maxcorr-bipolar', type=handleBool, action="extend", nargs="+", help='bipolar correlation')
     # correlation window
     parser.add_argument('--correlation-window', type=partial(handleNone, str), action="extend", nargs="+", help='correlation window')
+    # correlation phat
+    parser.add_argument('--correlation-phat', type=handleBool, action="extend", nargs="+", help='correlation phat')
     # correlation multi peak
     parser.add_argument('--correlation-multi-peak-strategy', type=partial(handleNone, str), action="extend", nargs="+", help='strategy to decide between multiple peaks in the cross-correlation function, either "ref", "max" or "mi"')
     # correlation peak threshold
@@ -211,11 +213,16 @@ def main():
         bipolar_options = [True]
     else:
         bipolar_options = args.maxcorr_bipolar
-    # correlation options
+    # correlation window
     if args.correlation_window is None:
         correlation_window_options = [None]
     else:
         correlation_window_options = args.correlation_window
+    # correlation phat
+    if args.correlation_phat is None:
+        correlation_phat_options = [False]
+    else:
+        correlation_phat_options = args.correlation_phat
     # correlation multi peak
     if args.correlation_multi_peak_strategy is None:
         correlation_multi_peak_strategy_options = [None]
@@ -275,25 +282,26 @@ def main():
     
     # option names
     options = {
-        "subject" : sub_options,
-        "session" : ses_options,
-        "task" : task_options,
-        "run" : run_options,
-        "space" : space_options,
-        "include-confounds" : include_confounds_options,
-        "voxel-mask" : voxel_mask_options,
-        "roi-masker" : roi_masker_options,
-        "spatial-smoothing-fwhm" : smoothing_fwhm_options,
-        "min-sample-freq" : min_sample_freq_options,
-        "analysis-bounds" : analysis_bounds_options,
-        "detrend-linear-order" : detrend_linear_order_options,
-        "temporal-filter-freq" : temporal_filter_freq_options,
-        "baseline-strategy" : baseline_strategy_options,
-        "use-co2-regressor" : co2_options,
-        "global-align-co2-bounds" : global_align_co2_bounds_options,
-        "align-regressor-bounds" : align_regressor_bounds_options,
-        "maxcorr-bipolar" : bipolar_options,
-        "correlation-window" : correlation_window_options,
+        "subject"                                   : sub_options,
+        "session"                                   : ses_options,
+        "task"                                      : task_options,
+        "run"                                       : run_options,
+        "space"                                     : space_options,
+        "include-confounds"                         : include_confounds_options,
+        "voxel-mask"                                : voxel_mask_options,
+        "roi-masker"                                : roi_masker_options,
+        "spatial-smoothing-fwhm"                    : smoothing_fwhm_options,
+        "min-sample-freq"                           : min_sample_freq_options,
+        "analysis-bounds"                           : analysis_bounds_options,
+        "detrend-linear-order"                      : detrend_linear_order_options,
+        "temporal-filter-freq"                      : temporal_filter_freq_options,
+        "baseline-strategy"                         : baseline_strategy_options,
+        "use-co2-regressor"                         : co2_options,
+        "global-align-co2-bounds"                   : global_align_co2_bounds_options,
+        "align-regressor-bounds"                    : align_regressor_bounds_options,
+        "maxcorr-bipolar"                           : bipolar_options,
+        "correlation-window"                        : correlation_window_options,
+        "correlation-phat"                          : correlation_phat_options,
         "correlation-multi-peak-strategy"           : correlation_multi_peak_strategy_options,
         "correlation-peak-threshold"                : correlation_peak_threshold_options,
         "ensure-co2-units"                          : ensure_co2_units_options,

@@ -62,6 +62,14 @@ def createHashCheckOverride(
     # check if refining regressor, if not change parameters
     if correlation_multi_peak_strategy is None:
         correlation_peak_threshold = None
+
+    # check if filtering timeshifts, if not change parameters
+    if filter_timeshifts_filter_type is None:
+        filter_timeshifts_size = None
+
+    # check if aligning, if not change parameters
+    if align_regressor_lower_bound is not None and align_regressor_upper_bound is not None and align_regressor_lower_bound == align_regressor_upper_bound:
+        maxcorr_bipolar = None
    
     # analysis info
     analysis_info = {
@@ -77,9 +85,9 @@ def createHashCheckOverride(
         "use-co2-regressor"                         : bool(use_co2_regressor),
         "global-align-co2-bounds"                   : try_conv((global_align_co2_lower_bound, global_align_co2_upper_bound), float),
         "align-regressor-bounds"                    : try_conv((align_regressor_lower_bound, align_regressor_upper_bound), float),
-        "maxcorr-bipolar"                           : bool(maxcorr_bipolar),
-        "correlation-phat"                          : bool(correlation_window),
-        "correlation-window"                        : try_conv(correlation_phat, str),
+        "maxcorr-bipolar"                           : try_conv(maxcorr_bipolar, bool),
+        "correlation-phat"                          : bool(correlation_phat),
+        "correlation-window"                        : try_conv(correlation_window, str),
         "correlation-multi-peak-strategy"           : try_conv(correlation_multi_peak_strategy, str),
         "correlation-peak-threshold"                : try_conv(correlation_peak_threshold, float),
         "filter-timeshifts-filter-type"             : try_conv(filter_timeshifts_filter_type, str),
