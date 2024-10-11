@@ -6,6 +6,9 @@ WORKDIR /app
 
 RUN mamba update mamba
 
+RUN apt-get update
+RUN apt-get -y install gcc
+
 # Create Conda environment from the YAML file
 # COPY environment.yml .
 # RUN mamba env create -n cvr -f environment.yml
