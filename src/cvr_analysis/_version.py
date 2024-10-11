@@ -1,1 +1,1 @@
-__version__ = 'drypaper'
+__version__ = '1.0.drypaper'
