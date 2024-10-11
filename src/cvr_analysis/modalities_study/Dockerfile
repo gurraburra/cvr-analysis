@@ -9,7 +9,7 @@ RUN mamba update mamba
 # Create Conda environment from the YAML file
 # COPY environment.yml .
 # RUN mamba env create -n cvr -f environment.yml
-RUN mamba create -n cvr pip
+RUN mamba create -n cvr python=3.13.0 pip=24.2
 
 # Override default shell and use bash
 SHELL ["mamba", "run", "-n", "cvr", "/bin/bash", "-c"] 
