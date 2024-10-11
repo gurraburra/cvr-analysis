@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from nilearn import image
 import numpy as np
 import sys
-from scipy.ndimage import spline_filter
 import json
 
 class IMGShow:

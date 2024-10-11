@@ -2,8 +2,6 @@ from process_control import ProcessNode
 from bids import BIDSLayout
 from nilearn import image, masking
 import pandas as pd
-import nibabel
-import numpy as np
 import re
 
 class BIDSLoader(ProcessNode):

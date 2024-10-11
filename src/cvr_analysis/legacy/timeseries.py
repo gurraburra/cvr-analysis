@@ -6,7 +6,6 @@ import scipy.stats as sc_stats
 import pandas as pd
 import re
 from nilearn import masking, signal, image
-from scipy.interpolate import RegularGridInterpolator
 from scipy.signal import butter, filtfilt
 from collections.abc import Iterable
 from nilearn import glm
