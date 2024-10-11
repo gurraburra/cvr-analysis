@@ -27,7 +27,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-test = ["matplotlib", "jupyter", "ipywidgets", "ipympl"]
+test = ["matplotlib", "seaborn", "jupyter", "ipywidgets", "ipympl"]
 
 [project.scripts]
 cvr-modality-study = "cvr_analysis.modalities_study.run:main"

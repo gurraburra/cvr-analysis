@@ -14,9 +14,9 @@ cvr_analysis_wf = ProcessWorkflow(
         (ProcessWorkflow.input._, post_processing_wf.input.all),
         # regression 
         (ProcessWorkflow.input._, regression_wf.input[('baseline_strategy', 'use_co2_regressor', 'correlation_window', 'correlation_phat', 'correlation_peak_threshold', 'correlation_multi_peak_strategy', 'align_regressor_lower_bound', 'align_regressor_upper_bound', 'nr_parallel_processes', 'show_pbar', 'maxcorr_bipolar', 'filter_timeshifts_size', 'filter_timeshifts_filter_type', 'filter_timeshifts_smooth_fwhm', 'refine_regressor_correlation_threshold', 'refine_regressor_nr_recursions', 'refine_regressor_explained_variance', 'do_dtw', 'confound_regressor_correlation_threshold')]),
-        (post_processing_wf.output.temporal_filtered_detrended_time_limited_up_sampled_bold_timeseries, regression_wf.input.bold_timeseries),
-        (post_processing_wf.output.temporal_filtered_detrended_time_limited_global_aligned_up_sampled_co2_timeseries, regression_wf.input.co2_timeseries),
-        (post_processing_wf.output.temporal_filtered_detrended_time_limited_up_sampled_confounds_df, regression_wf.input.confounds_df),
+        (post_processing_wf.output.time_limited_temporal_filtered_detrended_up_sampled_bold_timeseries, regression_wf.input.bold_timeseries),
+        (post_processing_wf.output.time_limited_global_aligned_temporal_filtered_detrended_up_sampled_co2_timeseries, regression_wf.input.co2_timeseries),
+        (post_processing_wf.output.time_limited_temporal_filtered_detrended_up_sampled_confounds_df, regression_wf.input.confounds_df),
         (post_processing_wf.output.up_sampling_factor, regression_wf.input.down_sampling_factor),
         (post_processing_wf.output.up_sampled_sample_time, regression_wf.input.sample_time),
         (post_processing_wf.output.timeseries_masker, regression_wf.input.timeseries_masker),
