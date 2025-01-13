@@ -2,7 +2,6 @@ from process_control import ProcessNode
 import pandas as pd
 import numpy as np
 from sklearn.cluster import KMeans
-import sklearn.linear_model as lm
 from sklearn.metrics import r2_score
 import scipy.signal as sc_signal
 from scipy.stats import pearsonr
@@ -13,6 +12,7 @@ from scipy.ndimage import median_filter, uniform_filter, spline_filter, label, g
 from nilearn import image
 from sklearn.decomposition import PCA
 from functools import partial
+from cvr_analysis.modalities_study.workflows.utils._extended_sklearn_linreg import LinearRegression
 
 class BaselinePlateau(ProcessNode):
     """
@@ -429,7 +429,7 @@ class RegressCVR(ProcessNode):
     """
     Performs linear regression between regressir data och bold data.
     """
-    outputs = ("dof", "nr_predictors", "regressor_beta", "design_matrix", "betas", "predictions", "r_squared",  "adjusted_r_squared", "tsnr")
+    outputs = ("dof", "betas", "predictions", "regressor_beta", "regressor_t", "regressor_p", "design_matrix", "r_squared", "adjusted_r_squared", "tsnr")
 
     def _run(self, bold_ts : np.ndarray, regressor_timeseries : np.ndarray, confounds_df : pd.DataFrame = None, confound_regressor_correlation_threshold : float = None) -> tuple:
         # check confounds_df
@@ -445,7 +445,7 @@ class RegressCVR(ProcessNode):
         # check if no valid entries
         if np.all(nan_entries):
             # return all nans
-            return 0, design_matrix.shape[1], np.nan, design_matrix, np.full(design_matrix.shape[1], np.nan), np.full_like(bold_ts, np.nan), np.nan, np.nan, np.nan
+            return 0, np.full(design_matrix.shape[1], np.nan), np.full_like(bold_ts, np.nan), np.nan, np.nan, np.nan, design_matrix, np.nan, np.nan, np.nan
         non_nan_dm = design_matrix[~nan_entries]
         non_nan_bs = bold_ts[~nan_entries]
         # threshold conofunds
@@ -466,9 +466,10 @@ class RegressCVR(ProcessNode):
         # get dimensions
         n, p = non_nan_dm.shape
         # regress
-        reg = lm.LinearRegression(fit_intercept=False).fit(non_nan_dm, non_nan_bs)
+        reg = LinearRegression(fit_intercept=False).fit(non_nan_dm, non_nan_bs)
         betas = reg.coef_
-        non_nan_pred = reg.predict(non_nan_dm)
+        non_nan_pred = reg.pred
+        pred = design_matrix @ betas
         # r_squared
         r_squared = r2_score(non_nan_bs, non_nan_pred)
         # adjusted r-squared
@@ -480,7 +481,8 @@ class RegressCVR(ProcessNode):
         residual_sum_of_squares = np.sum((non_nan_bs - non_nan_pred)**2)
         # the baseline mean signal is 100 since we assume the bold signal has been normed by the basline and multiplied by 100
         tsnr = 100 / np.sqrt(residual_sum_of_squares / n) if residual_sum_of_squares > 0 else np.nan
-        # regressor beta
-        regressor_beta = betas[design_matrix.columns.get_loc("regressor")]
+        # regressor beta, t- and p-value
+        reg_idx = design_matrix.columns.get_loc("regressor")
+        regressor_beta, regressor_t, regressor_p = betas[reg_idx], reg.t[reg_idx], reg.p[reg_idx]
         # return
-        return n, p, regressor_beta, design_matrix, betas, design_matrix @ betas, r_squared, adjusted_r_squared, tsnr
+        return n - p, betas, pred, regressor_beta, regressor_t, regressor_p, design_matrix, r_squared, adjusted_r_squared, tsnr

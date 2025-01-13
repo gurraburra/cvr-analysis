@@ -53,7 +53,7 @@ cvr_analysis_wf = ProcessWorkflow(
         (regression_wf.output.boldIter_correlations, conditionally_save_data.input.bold_correlations),
         (regression_wf.output.boldIter_down_sampled_aligned_regressor_signal_timeseries, conditionally_save_data.input.bold_aligned_regressor_timeseries),
         (regression_wf.output.boldIter_dof, conditionally_save_data.input.bold_dof),
-        (regression_wf.output.boldIter_nr_predictors, conditionally_save_data.input.bold_nr_predictors),
+        (regression_wf.output.boldIter_regressor_p, conditionally_save_data.input.bold_p_value),
         (regression_wf.output.boldIter_down_sampled_bold_signal_predictions, conditionally_save_data.input.bold_predictions),
         (regression_wf.output.boldIter_r_squared, conditionally_save_data.input.bold_r_squared),
         (regression_wf.output.boldIter_adjusted_r_squared, conditionally_save_data.input.bold_adjusted_r_squared),
