@@ -111,7 +111,7 @@ class iCO2Ramp(iCO2Stim):
         super().__init__([div_t] * nr_div, list(intp_v))
 
 class iCO2Sinusoidal(iCO2Stim):
-    def __init__(self, duration : float, amplitude : float, division_size : float = 5) -> None:
+    def __init__(self, duration : float, amplitude : float, baseline : float = 0, quarter_period : bool = False, phase_offset : float = 0, division_size : float = 5) -> None:
         # nr divisions
         nr_div = int(duration / division_size)
         # check for even
@@ -123,7 +123,12 @@ class iCO2Sinusoidal(iCO2Stim):
         padding = div_t / 2
         # interp times
         intp_t = np.arange(padding, duration, div_t)
+        # period time 
+        if quarter_period:
+            period_time = 4 * duration
+        else:
+            period_time = 2 * duration
         # interpolate
-        intp_v = np.round(amplitude * np.sin(2*np.pi*intp_t / 2 / duration), 2)
+        intp_v = np.round(amplitude * np.sin(2*np.pi*intp_t / period_time + phase_offset ), 2) + baseline
         super().__init__([div_t] * int(nr_div), list(intp_v))
     
