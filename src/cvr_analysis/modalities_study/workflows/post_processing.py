@@ -27,6 +27,7 @@ bold_loader = LoadBOLDData(description="load in bold data")
 # co2 data loader
 ##############################################
 co2_loader = GetTimeSeriesEvent()
+cond_co2_loader = ConditionalNode("use_co2_regressor", {True : co2_loader, False : None}, description="conditionally load co2 data")
 
 ##############################################
 # voxel mask loader
@@ -78,16 +79,17 @@ data_loader_wf = ProcessWorkflow(
         # bold_data
         (ProcessWorkflow.input._, bold_loader.input.all / bold_loader.input[("load_confounds", "load_events")]),
         (ProcessWorkflow.input.include_confounds, bold_loader.input.load_confounds),
-        (ValueNode(True).output.value, bold_loader.input.load_events),
+        (ProcessWorkflow.input.use_co2_regressor, bold_loader.input.load_events),
         (bold_loader.output.confounds_df, ProcessWorkflow.output.confounds_df),
         (bold_loader.output.tr,  ProcessWorkflow.output.tr),
         (bold_loader.output.nr_measurements,  ProcessWorkflow.output.nr_measurements),
         # co2 wf
-        (bold_loader.output.events_df, co2_loader.input.events_df),
-        (ValueNode(["edited_end_tidal_co2", "end_tidal_co2"]).output.value, co2_loader.input.event_name),
-        (co2_loader.output.times, ProcessWorkflow.output.co2_times),
-        (co2_loader.output.timeseries, ProcessWorkflow.output.co2_timeseries),
-        (co2_loader.output.event_name, ProcessWorkflow.output.co2_event_name),
+        (ProcessWorkflow.input.use_co2_regressor, cond_co2_loader.input.use_co2_regressor),
+        (bold_loader.output.events_df, cond_co2_loader.input.events_df),
+        (ValueNode(["edited_end_tidal_co2", "end_tidal_co2"]).output.value, cond_co2_loader.input.event_name),
+        (cond_co2_loader.output.times, ProcessWorkflow.output.co2_times),
+        (cond_co2_loader.output.timeseries, ProcessWorkflow.output.co2_timeseries),
+        (cond_co2_loader.output.event_name, ProcessWorkflow.output.co2_event_name),
         # voxel mask loader
         (ProcessWorkflow.input._, voxel_mask_loader.input.all / voxel_mask_loader.input[("desc", "suffix")]),
         (ProcessWorkflow.input.voxel_mask, voxel_mask_loader.input.desc),
@@ -187,6 +189,7 @@ global_co2_align_wf = ProcessWorkflow(
     ), description="global co2 align wf"
 )
 
+cond_global_co2_align = ConditionalNode("use_co2_regressor", {True : global_co2_align_wf, False : None}, description="align co2 regresor only if co2 regressor loaded")
 # %%
 ##############################################
 # time limit timeseries
@@ -308,17 +311,17 @@ signal_processing_wf = ProcessWorkflow(
         (detrend_wf.output.detrended_confounds_df, temporal_filter_wf.input.confounds_df),
         (detrend_wf.output.detrended_co2_timeseries, temporal_filter_wf.input.co2_timeseries),
         # global align co2
-        (ProcessWorkflow.input._, global_co2_align_wf.input[("correlation_phat", "correlation_window", "global_align_co2_lower_bound", "global_align_co2_upper_bound")]),
-        (resample_wf.output.new_sample_time, global_co2_align_wf.input.sample_time),
-        (temporal_filter_wf.output.temporal_filtered_bold_timeseries, global_co2_align_wf.input.bold_timeseries),
-        (temporal_filter_wf.output.temporal_filtered_co2_timeseries, global_co2_align_wf.input.co2_timeseries),
+        (ProcessWorkflow.input._, cond_global_co2_align.input[("use_co2_regressor", "correlation_phat", "correlation_window", "global_align_co2_lower_bound", "global_align_co2_upper_bound")]),
+        (resample_wf.output.new_sample_time, cond_global_co2_align.input.sample_time),
+        (temporal_filter_wf.output.temporal_filtered_bold_timeseries, cond_global_co2_align.input.bold_timeseries),
+        (temporal_filter_wf.output.temporal_filtered_co2_timeseries, cond_global_co2_align.input.co2_timeseries),
         # time limit wf
         (ProcessWorkflow.input.analysis_start_time, time_limit_wf.input.analysis_start_time),
         (ProcessWorkflow.input.analysis_end_time, time_limit_wf.input.analysis_end_time),
         (resample_wf.output.new_sample_time, time_limit_wf.input.sample_time),
         (temporal_filter_wf.output.temporal_filtered_bold_timeseries, time_limit_wf.input.bold_timeseries),
         (temporal_filter_wf.output.temporal_filtered_confounds_df, time_limit_wf.input.confounds_df),
-        (global_co2_align_wf.output.global_aligned_co2_timeseries, time_limit_wf.input.co2_timeseries),
+        (cond_global_co2_align.output.global_aligned_co2_timeseries, time_limit_wf.input.co2_timeseries),
         (time_limit_wf.output.time_limited_bold_timeseries, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_bold_timeseries),
         (time_limit_wf.output.time_limited_confounds_df, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_confounds_df),
         (time_limit_wf.output.time_limited_co2_timeseries, ProcessWorkflow.output.time_limited_global_aligned_temporal_filtered_detrended_up_sampled_co2_timeseries),
@@ -338,7 +341,7 @@ post_processing_wf = ProcessWorkflow(
         (data_loader_wf.output.timeseries_masker, ProcessWorkflow.output.timeseries_masker),
         (data_loader_wf.output.tr, ProcessWorkflow.output.bold_tr),
         # signal processing wf
-        (ProcessWorkflow.input._, signal_processing_wf.input[("min_sample_freq", "analysis_start_time", "analysis_end_time", "detrend_linear_order", "temporal_filter_freq", "correlation_phat", "correlation_window", "global_align_co2_lower_bound", "global_align_co2_upper_bound")]),
+        (ProcessWorkflow.input._, signal_processing_wf.input[("use_co2_regressor", "min_sample_freq", "analysis_start_time", "analysis_end_time", "detrend_linear_order", "temporal_filter_freq", "correlation_phat", "correlation_window", "global_align_co2_lower_bound", "global_align_co2_upper_bound")]),
         (data_loader_wf.output.tr, signal_processing_wf.input.bold_tr),
         (data_loader_wf.output.bold_times, signal_processing_wf.input.bold_times),
         (data_loader_wf.output.bold_timeseries, signal_processing_wf.input.bold_timeseries),

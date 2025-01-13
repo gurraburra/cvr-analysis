@@ -25,7 +25,19 @@ from cvr_analysis.modalities_study.workflows.utils.confounds import MotionConfou
 # get timeseries signal values
 bold_baseline = BaselineTimeSeries(description="baseline bold timeseries")
 global_baseline = BaselineTimeSeries(description="baseline global timeseries")
+
+# co2
 co2_baseline = BaselineTimeSeries(description="baseline co2 timeseries")
+co2_signal_wf = ProcessWorkflow(
+    (
+        (ProcessWorkflow.input.co2_timeseries, co2_baseline.input.timeseries),
+        (ProcessWorkflow.input.baseline_strategy, co2_baseline.input.baseline_strategy),
+        (ProcessWorkflow.input.sample_time, co2_baseline.input.time_step),
+        (ProcessWorkflow.input.co2_timeseries - co2_baseline.output.baseline, ProcessWorkflow.output.co2_signal_timeseries),
+    ),
+    description="create co2 signal"
+)
+cond_co2_signal = ConditionalNode("use_co2_regressor", {True : co2_signal_wf, False : None}, description="conditionally compute co2 signal")
 
 # get timeseries signal values
 bold_percentage = PercentageChangeTimeSeries(description="percentage bold timeseries")
@@ -52,10 +64,11 @@ signal_timeseries_wf = ProcessWorkflow(
         (global_baseline.output.baseline, global_percentage.input.baseline),
         (global_percentage.output.percentage_timeseries, ProcessWorkflow.output.global_signal_timeseries),
         # co2 baseline
-        (ProcessWorkflow.input.co2_timeseries, co2_baseline.input.timeseries),
-        (ProcessWorkflow.input.baseline_strategy, co2_baseline.input.baseline_strategy),
-        (ProcessWorkflow.input.sample_time, co2_baseline.input.time_step),
-        (ProcessWorkflow.input.co2_timeseries - co2_baseline.output.baseline, ProcessWorkflow.output.co2_signal_timeseries),
+        (ProcessWorkflow.input.use_co2_regressor, cond_co2_signal.input.use_co2_regressor),
+        (ProcessWorkflow.input.co2_timeseries, cond_co2_signal.input.co2_timeseries),
+        (ProcessWorkflow.input.baseline_strategy, cond_co2_signal.input.baseline_strategy),
+        (ProcessWorkflow.input.sample_time, cond_co2_signal.input.sample_time),
+        (cond_co2_signal.output.co2_signal_timeseries, ProcessWorkflow.output.co2_signal_timeseries),
         # confounds
         (ProcessWorkflow.input.confounds_df, confounds_std.input.timeseries),
         (confounds_std.output.standardized_timeseries, ProcessWorkflow.output.confounds_signal_df),
@@ -70,10 +83,12 @@ signal_timeseries_wf = ProcessWorkflow(
 # power
 regressor_rms = RMSTimeSeries(description="regressor rms")
 co2_rms = RMSTimeSeries(description="co2 rms")
+cond_co2_rms = ConditionalNode("use_co2_regressor", {True : co2_rms, False : None}, description="conditionally calculate co2 rms")
 
 # autocorrelation
 regressor_autocorrelation = Correlate(description="regressor timeseries autocorrelation")
 co2_autocorrelation = Correlate(description="co2 timeseries autocorrelation")
+cond_co2_autocorrelation = ConditionalNode("use_co2_regressor", {True : co2_autocorrelation, False : None}, description="conditionally calculate co2 autocorrelations")
 
 # %%
 signal_characterics_wf = ProcessWorkflow(
@@ -95,21 +110,23 @@ signal_characterics_wf = ProcessWorkflow(
             (regressor_autocorrelation.output.timeshifts, ProcessWorkflow.output.regressor_signal_autocorrelation_timeshifts),
             (regressor_autocorrelation.output.correlations, ProcessWorkflow.output.regressor_signal_autocorrelation_correlations),
             # co2 signal rms
-            (ProcessWorkflow.input.co2_signal_timeseries, co2_rms.input.timeseries),
-            (co2_rms.output.rms, ProcessWorkflow.output.co2_signal_rms),
+            (ProcessWorkflow.input.use_co2_regressor, cond_co2_rms.input.use_co2_regressor),
+            (ProcessWorkflow.input.co2_signal_timeseries, cond_co2_rms.input.timeseries),
+            (cond_co2_rms.output.rms, ProcessWorkflow.output.co2_signal_rms),
             # co2 autocorrelation
-            (ProcessWorkflow.input.correlation_window, co2_autocorrelation.input.window),
-            (ProcessWorkflow.input.correlation_phat, co2_autocorrelation.input.phat),
-            (ProcessWorkflow.input.sample_time, co2_autocorrelation.input.time_step),
-            (ProcessWorkflow.input.co2_signal_timeseries, co2_autocorrelation.input[("signal_timeseries_a", "signal_timeseries_b")]),
-            (ValueNode(None).output.value, co2_autocorrelation.input.peak_threshold),
-            (ValueNode(None).output.value, co2_autocorrelation.input.multi_peak_strategy),
-            (ValueNode(0).output.value, co2_autocorrelation.input.ref_timeshift),
-            (ValueNode(None).output.value, co2_autocorrelation.input.lower_limit),
-            (ValueNode(None).output.value, co2_autocorrelation.input.upper_limit),
-            (ValueNode(True).output.value, co2_autocorrelation.input.bipolar),
-            (co2_autocorrelation.output.timeshifts, ProcessWorkflow.output.co2_signal_autocorrelation_timeshifts),
-            (co2_autocorrelation.output.correlations, ProcessWorkflow.output.co2_signal_autocorrelation_correlations),
+            (ProcessWorkflow.input.use_co2_regressor, cond_co2_autocorrelation.input.use_co2_regressor),
+            (ProcessWorkflow.input.correlation_window, cond_co2_autocorrelation.input.window),
+            (ProcessWorkflow.input.correlation_phat, cond_co2_autocorrelation.input.phat),
+            (ProcessWorkflow.input.sample_time, cond_co2_autocorrelation.input.time_step),
+            (ProcessWorkflow.input.co2_signal_timeseries, cond_co2_autocorrelation.input[("signal_timeseries_a", "signal_timeseries_b")]),
+            (ValueNode(None).output.value, cond_co2_autocorrelation.input.peak_threshold),
+            (ValueNode(None).output.value, cond_co2_autocorrelation.input.multi_peak_strategy),
+            (ValueNode(0).output.value, cond_co2_autocorrelation.input.ref_timeshift),
+            (ValueNode(None).output.value, cond_co2_autocorrelation.input.lower_limit),
+            (ValueNode(None).output.value, cond_co2_autocorrelation.input.upper_limit),
+            (ValueNode(True).output.value, cond_co2_autocorrelation.input.bipolar),
+            (cond_co2_autocorrelation.output.timeshifts, ProcessWorkflow.output.co2_signal_autocorrelation_timeshifts),
+            (cond_co2_autocorrelation.output.correlations, ProcessWorkflow.output.co2_signal_autocorrelation_correlations),
         ),
         description="signal characteristics"
 )
@@ -368,7 +385,7 @@ align_downsample_wf = ProcessWorkflow(
 )
 
 # %%
-# regress bold and regressor
+# regress regressor and co2
 regressor_co2_correlate = Correlate(description="regressor co2 regress")
 regressor_co2_align_downsample = align_downsample_wf.copy(description = "regressor co2 align downsample")
 regressor_co2_regression = RegressCVR(description="regressor co2 regression")
@@ -405,6 +422,8 @@ regressor_co2_regression_wf = ProcessWorkflow(
     ),
     description="regressor co2 timeshift and beta wf"
 )
+
+cond_regressor_co2_regression = ConditionalNode("use_co2_regressor", {True : regressor_co2_regression_wf, False : None}, description="conditional regress regressor and co2 timseries")
 # %%
 setup_regression_wf = ProcessWorkflow(
     (
@@ -431,6 +450,7 @@ setup_regression_wf = ProcessWorkflow(
         (recursively_refine_regressor.output.Rec_refined_regressor_signal_timeseries, conditional_dtw.input.target_timeseries),
         (conditional_dtw.output.warped_timeseries, ProcessWorkflow.output.regressor_signal_timeseries),
         # signal characterics
+        (ProcessWorkflow.input.use_co2_regressor, signal_characterics_wf.input.use_co2_regressor),
         (ProcessWorkflow.input.correlation_window, signal_characterics_wf.input.correlation_window),
         (ProcessWorkflow.input.correlation_phat, signal_characterics_wf.input.correlation_phat),
         (ProcessWorkflow.input.sample_time, signal_characterics_wf.input.sample_time),
@@ -444,18 +464,18 @@ setup_regression_wf = ProcessWorkflow(
         (ValueNode(True).output.value, get_regression_confounds_wf.input.motion_powers),
         (get_regression_confounds_wf.output.all, ProcessWorkflow.output._),
         # regressor_co2_regression_wf
-        (ProcessWorkflow.input._, regressor_co2_regression_wf.input[("sample_time", "down_sampling_factor", "correlation_window", "correlation_phat", "correlation_peak_threshold", "correlation_multi_peak_strategy")]),
-        (ProcessWorkflow.input.confound_regressor_correlation_threshold, regressor_co2_regression_wf.input.confound_regressor_correlation_threshold),
-        (signal_timeseries_wf.output.co2_signal_timeseries, regressor_co2_regression_wf.input.co2_signal_timeseries),
-        (conditional_dtw.output.warped_timeseries, regressor_co2_regression_wf.input.regressor_signal_timeseries),
-        (get_regression_confounds_wf.output.down_sampled_regression_confounds_signal_df, regressor_co2_regression_wf.input.down_sampled_regression_confounds_signal_df),
-        (regressor_co2_regression_wf.output.timeshift_maxcorr, ProcessWorkflow.output.regressor_co2_timeshift_maxcorr),
-        (regressor_co2_regression_wf.output.maxcorr, ProcessWorkflow.output.regressor_co2_maxcorr),
-        (regressor_co2_regression_wf.output.timeshifts, ProcessWorkflow.output.regressor_co2_timeshifts),
-        (regressor_co2_regression_wf.output.correlations, ProcessWorkflow.output.regressor_co2_correlations),
-        (regressor_co2_regression_wf.output.down_sampled_regressor_signal_timeseries, ProcessWorkflow.output.down_sampled_regressor_signal_timeseries),
-        (regressor_co2_regression_wf.output.down_sampled_regressor_aligned_co2_signal_timeseries, ProcessWorkflow.output.down_sampled_regressor_aligned_co2_signal_timeseries),
-        (regressor_co2_regression_wf.output.regressor_beta, ProcessWorkflow.output.regressor_co2_beta),
+        (ProcessWorkflow.input._, cond_regressor_co2_regression.input[("use_co2_regressor", "sample_time", "down_sampling_factor", "correlation_window", "correlation_phat", "correlation_peak_threshold", "correlation_multi_peak_strategy")]),
+        (ProcessWorkflow.input.confound_regressor_correlation_threshold, cond_regressor_co2_regression.input.confound_regressor_correlation_threshold),
+        (signal_timeseries_wf.output.co2_signal_timeseries, cond_regressor_co2_regression.input.co2_signal_timeseries),
+        (conditional_dtw.output.warped_timeseries, cond_regressor_co2_regression.input.regressor_signal_timeseries),
+        (get_regression_confounds_wf.output.down_sampled_regression_confounds_signal_df, cond_regressor_co2_regression.input.down_sampled_regression_confounds_signal_df),
+        (cond_regressor_co2_regression.output.timeshift_maxcorr, ProcessWorkflow.output.regressor_co2_timeshift_maxcorr),
+        (cond_regressor_co2_regression.output.maxcorr, ProcessWorkflow.output.regressor_co2_maxcorr),
+        (cond_regressor_co2_regression.output.timeshifts, ProcessWorkflow.output.regressor_co2_timeshifts),
+        (cond_regressor_co2_regression.output.correlations, ProcessWorkflow.output.regressor_co2_correlations),
+        (cond_regressor_co2_regression.output.down_sampled_regressor_signal_timeseries, ProcessWorkflow.output.down_sampled_regressor_signal_timeseries),
+        (cond_regressor_co2_regression.output.down_sampled_regressor_aligned_co2_signal_timeseries, ProcessWorkflow.output.down_sampled_regressor_aligned_co2_signal_timeseries),
+        (cond_regressor_co2_regression.output.regressor_beta, ProcessWorkflow.output.regressor_co2_beta),
         
     ),
     description="setup regression wf"

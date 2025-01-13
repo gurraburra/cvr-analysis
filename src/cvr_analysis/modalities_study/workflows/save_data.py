@@ -104,7 +104,12 @@ def createHashCheckOverride(
     # analysis id
     analysis_id = hashlib.sha1(str(tuple(analysis_info.items())).encode("UTF-8")).hexdigest()[:15]
     # create preamble
-    analysis_file = os.path.join(files_folder, f"sub-{subject}_ses-{session}_task-{task}_run-{run}_space-{space}_analys-{analysis_id}_desc-analys_info.json")
+    def getBStr(var, val):
+        if val is not None:
+            return f"{var}-{val}_"
+        else:
+            return ""
+    analysis_file = os.path.join(files_folder, f"sub-{subject}_{getBStr("ses",session)}{getBStr("task",task)}{getBStr("run",run)}{getBStr("space",space)}analys-{analysis_id}_desc-analys_info.json")
     # run or dont run
     run_analysis = force_run or not os.path.isfile(analysis_file)
 
@@ -135,8 +140,8 @@ def saveData(
                                                     bold_preproc_timeseries, bold_timeshift_maxcorr, bold_maxcorr, bold_timeshifts, bold_correlations,
                                                         bold_aligned_regressor_timeseries,
                                                             # bold regression data
-                                                            bold_dof, bold_nr_predictors, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_tsnr, 
-                                                                bold_cvr_amplitude, regression_down_sampled_sample_time,
+                                                            bold_dof, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_tsnr, 
+                                                                bold_cvr_amplitude, bold_p_value, regression_down_sampled_sample_time,
                                                                     # full output
                                                                     full_output = False) -> tuple:
         
@@ -153,13 +158,13 @@ def saveData(
             timeseries_masker.inverse_transform(bold_predictions.T).to_filename(preamble + "desc-predictions_bold.nii.gz")
         # 3D data
         timeseries_masker.inverse_transform(bold_cvr_amplitude).to_filename(preamble + "desc-cvrAmplitude_map.nii.gz")
+        timeseries_masker.inverse_transform(bold_p_value).to_filename(preamble + "desc-pValue_map.nii.gz")
         timeseries_masker.inverse_transform(bold_timeshift_maxcorr).to_filename(preamble + "desc-cvrTimeshift_map.nii.gz")
         timeseries_masker.inverse_transform(bold_tsnr).to_filename(preamble + "desc-tsnr_map.nii.gz")
         timeseries_masker.inverse_transform(bold_r_squared).to_filename(preamble + "desc-rSquared_map.nii.gz")
         timeseries_masker.inverse_transform(bold_maxcorr).to_filename(preamble + "desc-maxCorr_map.nii.gz")
         if full_output:
             timeseries_masker.inverse_transform(bold_dof.astype(np.int32)).to_filename(preamble + "desc-dof_map.nii.gz")
-            timeseries_masker.inverse_transform(bold_nr_predictors.astype(np.int32)).to_filename(preamble + "desc-nrPredictors_map.nii.gz")
             timeseries_masker.inverse_transform(bold_adjusted_r_squared).to_filename(preamble + "desc-rSquaredAdjusted_map.nii.gz")            
         # 1D data
         if full_output:
@@ -170,15 +175,17 @@ def saveData(
             # regressor co2
             saveTimeseriesInfo(preamble + "desc-regressorAlignedCO2Series_timeseries.json", 0, regression_down_sampled_sample_time)
             pd.DataFrame(np.vstack((regressor_preproc_timeseries, regressor_aligned_co2_timeseries)).T, columns=["regressor_series", "aligned_co2_series"]).to_csv(preamble + "desc-regressorAlignedCO2Series_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
-            # regressor co2 correlations
-            saveTimeseriesInfo(preamble + "desc-regressorCO2Correlations_timeseries.json", regressor_co2_timeshifts[0], up_sampled_sample_time)
-            pd.Series(regressor_co2_correlations).to_csv(preamble + "desc-regressorCO2Correlations_timeseries.tsv.gz", sep="\t", index = False, header=False, compression="gzip")
             # regressor autocorrelation
             saveTimeseriesInfo(preamble + "desc-regressorAutocorrelations_timeseries.json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
             pd.Series(regressor_autocorrelation_correlations).to_csv(preamble + "desc-regressorAutocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+            # regressor co2 correlations
+            if regressor_co2_correlations is not None:
+                saveTimeseriesInfo(preamble + "desc-regressorCO2Correlations_timeseries.json", regressor_co2_timeshifts[0], up_sampled_sample_time)
+                pd.Series(regressor_co2_correlations).to_csv(preamble + "desc-regressorCO2Correlations_timeseries.tsv.gz", sep="\t", index = False, header=False, compression="gzip")
             # co2 autocorrelation
-            saveTimeseriesInfo(preamble + "desc-co2Autocorrelations_timeseries.json", co2_autocorrelation_timeshifts[0], up_sampled_sample_time)
-            pd.Series(co2_autocorrelation_correlations).to_csv(preamble + "desc-co2Autocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+            if co2_autocorrelation_correlations is not None:
+                saveTimeseriesInfo(preamble + "desc-co2Autocorrelations_timeseries.json", co2_autocorrelation_timeshifts[0], up_sampled_sample_time)
+                pd.Series(co2_autocorrelation_correlations).to_csv(preamble + "desc-co2Autocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
         # pd.Series(bold_timeshifts, name="timeshifts").to_csv(preamble + "desc-boldTimeshifts_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
         if full_output:
             pass

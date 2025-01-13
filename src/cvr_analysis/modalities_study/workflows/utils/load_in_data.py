@@ -52,7 +52,6 @@ def _getBIDSFiles(bids_directory, subject, session=None, task=None, run=None, sp
         file_spec += f"{extension}"
     elif file_spec[-1] != '*':
         file_spec += '*'
-
     return glob(os.path.join(base_dir, file_spec))
     
 
@@ -71,7 +70,7 @@ class LoadBOLDData(ProcessNode):
                                                         run=run, 
                                                             space=space, 
                                                                 suffix="bold", 
-                                                                    extension=".nii.gz")))
+                                                                    extension=".nii*")))
         # nr_meas
         nr_meas = bold_img.shape[3]
 
@@ -145,7 +144,7 @@ class LoadBidsImg(ProcessNode):
                                                 space=space, 
                                                     desc=desc,
                                                         suffix=suffix, 
-                                                            extension=".nii.gz"))
+                                                            extension=".nii*"))
         # load in bids data
         bids_img = image.load_img(bids_file)
         
