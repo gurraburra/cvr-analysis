@@ -133,12 +133,12 @@ class IMGShow:
 def stand(sig):
     return (sig - np.nanmean(sig, axis = -1)[..., np.newaxis]) / np.nanstd(sig, axis = -1)[..., np.newaxis]
 
-def maxMinNorn(sig):
+def maxMinNorm(sig):
     return sig / (np.nanmax(sig, axis = -1) - np.nanmin(sig, axis = -1))[..., np.newaxis]
 
-norm_funcs = {"stand" : stand, "maxMinNorm" : maxMinNorn}
+norm_funcs = {"stand" : stand, "maxMin" : maxMinNorm, None : lambda x : x}
 
-def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', img_transform = None, norm : str = "maxMinNorm", data_include = "bold+regressor+predictions", apply_transform = True, **custom_settings):
+def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_transform = None, norm : str = "maxMin", data_include = "bold+regressor+predictions", ensure_uniform_sampling = True, **custom_settings):
     # settings
     settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower", 'interpolation' : 'antialiased'}
     settings.update(custom_settings)
@@ -149,8 +149,8 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', img_tr
     preamble = analys_file.split("_desc-analys_info")[0]
     # cvr file
     cvr_img = image.load_img(os.path.join(folder, preamble + f"_desc-{img_desc}_map.nii.gz"))
-    # apply_transform 
-    if apply_transform:
+    # ensure_uniform_sampling 
+    if ensure_uniform_sampling:
         # store all corner points
         points = []
         for x,y,z in product(*[[0,s-1] for s in cvr_img.shape]):
@@ -182,8 +182,8 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', img_tr
     # cvr_mask = np.abs(cvr_data) < 1e-10
     # mask data
     cvr_img_masked = cvr_data #  np.ma.masked_where(cvr_mask, cvr_data)
-    if img_transform is not None:
-        cvr_img_masked = img_transform(cvr_img_masked)
+    if cvr_transform is not None:
+        cvr_img_masked = cvr_transform(cvr_img_masked)
     # data
     data = []
     # spit data include
@@ -199,7 +199,7 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', img_tr
     if "bold" in data_include:
         try:
             bold_img = image.load_img(os.path.join(folder, preamble + "_desc-preproc_bold.nii.gz"))
-            data.append((bold_img.get_fdata(), "bold"))
+            data.append((norm_func(bold_img.get_fdata()), "bold"))
         except:
             print("No bold img found")
     # get aligned regressor data
