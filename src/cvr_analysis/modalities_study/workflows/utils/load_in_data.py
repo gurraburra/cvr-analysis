@@ -20,12 +20,17 @@ def _isNiftiFile(desc):
     else:
         return desc
     
-def _getBIDSFiles(bids_directory, subject, session=None, task=None, run=None, space=None, desc=None, suffix=None, extension=None):
+def _getBIDSFiles(bids_directory, subject, session=None, data_type=None, task=None, acq=None, run=None, space=None, desc=None, suffix=None, extension=None):
+    # data type
+    if data_type is None:
+        data_folder = "*"
+    else:
+        data_folder = data_type
     # base dir
     if session is None:
-        base_dir = os.path.join(bids_directory, f"sub-{subject}", "*")
+        base_dir = os.path.join(bids_directory, f"sub-{subject}", data_folder)
     else:
-        base_dir = os.path.join(bids_directory, f"sub-{subject}", f"ses-{session}", "*")
+        base_dir = os.path.join(bids_directory, f"sub-{subject}", f"ses-{session}", data_folder)
     # file specification
     file_spec = f"sub-{subject}"
     # add optional specifyers
@@ -33,6 +38,8 @@ def _getBIDSFiles(bids_directory, subject, session=None, task=None, run=None, sp
         file_spec += f"_ses-{session}"
     if task is not None:
         file_spec += f"_task-{task}"
+    if acq is not None:
+        file_spec += f"_acq-{acq}"
     if run is not None:
         file_spec += f"_run-{run}"
     if space is not None:
@@ -79,11 +86,12 @@ class LoadBOLDData(ProcessNode):
                                         bids_directory,
                                             subject=subject, 
                                                 session=session, 
-                                                    task=task, 
-                                                        run=run, 
-                                                            space=space, 
-                                                                suffix="bold", 
-                                                                    extension=".json"))
+                                                    data_type="func",
+                                                        task=task, 
+                                                            run=run, 
+                                                                space=space, 
+                                                                    suffix="bold", 
+                                                                        extension=".json"))
     
         # tr
         # tr = bids_directory.get_metadata(bold_img.get_filename())["RepetitionTime"]
@@ -98,25 +106,38 @@ class LoadBOLDData(ProcessNode):
                                         bids_directory,
                                             subject=subject, 
                                                 session=session, 
-                                                    task=task, 
-                                                        run=run, 
-                                                            suffix="timeseries", 
-                                                                extension=".tsv")), sep='\t')
+                                                    data_type="func",
+                                                        task=task, 
+                                                            run=run, 
+                                                                suffix="timeseries", 
+                                                                    extension=".tsv")), sep='\t')
         else:
             confounds_df = None
         
         # load in events
         if load_events:
-            events_df = pd.read_csv(
-                                _checkBIDSQuery("events", 
-                                     _getBIDSFiles(
-                                        bids_directory, 
-                                            subject=subject, 
-                                                session=session, 
-                                                    task=task, 
-                                                        run=run, 
-                                                            suffix="events", 
-                                                                extension=".tsv")), sep='\t')
+            for acq in ["bold", None]:
+                # try events using acq
+                try:
+                    events_df = pd.read_csv(
+                                        _checkBIDSQuery("events", 
+                                            _getBIDSFiles(
+                                                bids_directory, 
+                                                    subject=subject, 
+                                                        session=session, 
+                                                            data_type="func",
+                                                                task=task, 
+                                                                    acq=acq,
+                                                                        run=run, 
+                                                                            suffix="events", 
+                                                                                extension=".tsv")), sep='\t')
+                except ValueError:
+                    continue
+                break
+            else:
+                raise ValueError("Could not load events file.")
+
+
         else:
             events_df = None
 
