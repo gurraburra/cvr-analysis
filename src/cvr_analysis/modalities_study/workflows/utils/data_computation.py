@@ -432,14 +432,25 @@ class RegressCVR(ProcessNode):
     outputs = ("dof", "betas", "predictions", "regressor_beta", "regressor_t", "regressor_p", "design_matrix", "r_squared", "adjusted_r_squared", "tsnr")
 
     def _run(self, bold_ts : np.ndarray, regressor_timeseries : np.ndarray, confounds_df : pd.DataFrame = None, confound_regressor_correlation_threshold : float = None) -> tuple:
+        # check regressor
+        if regressor_timeseries is None:
+            regressor_timeseries = pd.DataFrame([], index = range(len(bold_ts)))
+        else:
+            regressor_timeseries = pd.Series(regressor_timeseries, name = "regressor")
         # check confounds_df
         if confounds_df is None:
             confounds_df = pd.DataFrame([], index = range(len(bold_ts)))
+        else:
+            confounds_df = pd.DataFrame(confounds_df)
         # create design matrix
-        design_matrix = pd.concat((pd.Series(regressor_timeseries, name = "regressor"), confounds_df.reset_index(drop=True)), axis = 1)
+        design_matrix = pd.concat((regressor_timeseries, confounds_df.reset_index(drop=True)), axis = 1)
+        if design_matrix.empty:
+            raise ValueError("No independent variables provided.")
         # add constant
         if "constant" not in design_matrix:
             design_matrix["constant"] = 1
+        # make sure columns are string
+        design_matrix.columns = design_matrix.columns.astype(str)
         # find nan rows
         nan_entries = design_matrix.isna().any(axis=1) | np.isnan(bold_ts)
         # check if no valid entries
@@ -449,7 +460,7 @@ class RegressCVR(ProcessNode):
         non_nan_dm = design_matrix[~nan_entries]
         non_nan_bs = bold_ts[~nan_entries]
         # threshold conofunds
-        if confound_regressor_correlation_threshold is not None and not confounds_df.empty:
+        if confound_regressor_correlation_threshold is not None and not confounds_df.empty and not regressor_timeseries.empty:
             # get standardized confounds
             confounds = non_nan_dm[confounds_df.columns].to_numpy()
             confounds = (confounds - confounds.mean(axis = 0)) / confounds.std(axis = 0)
@@ -482,7 +493,10 @@ class RegressCVR(ProcessNode):
         # the baseline mean signal is 100 since we assume the bold signal has been normed by the basline and multiplied by 100
         tsnr = 100 / np.sqrt(residual_sum_of_squares / n) if residual_sum_of_squares > 0 else np.nan
         # regressor beta, t- and p-value
-        reg_idx = design_matrix.columns.get_loc("regressor")
-        regressor_beta, regressor_t, regressor_p = betas[reg_idx], reg.t[reg_idx], reg.p[reg_idx]
+        if not regressor_timeseries.empty:
+            reg_idx = design_matrix.columns.get_loc("regressor")
+            regressor_beta, regressor_t, regressor_p = betas[reg_idx], reg.t[reg_idx], reg.p[reg_idx]
+        else:
+            regressor_beta, regressor_t, regressor_p = np.nan, np.nan, np.nan
         # return
         return n - p, betas, pred, regressor_beta, regressor_t, regressor_p, design_matrix, r_squared, adjusted_r_squared, tsnr
