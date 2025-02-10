@@ -153,12 +153,12 @@ class LoadBidsImg(ProcessNode):
 
 
 class CropBOLDImg(ProcessNode):
-    outputs = ("cropped_bold_img",)
+    outputs = ("cropped_bold_img", "resampled_voxel_mask_img")
 
     def _run(self, bold_img, voxel_mask_img):
         # make sure they are aligned
-        tmp_mask = image.resample_to_img(voxel_mask_img, bold_img, interpolation='nearest')
-        return image.math_img('img * np.array(voxel_mask, dtype=bool)[...,None]', img = bold_img, voxel_mask = tmp_mask), 
+        resampled_voxel_mask_img = image.resample_to_img(voxel_mask_img, bold_img, interpolation='nearest')
+        return image.math_img('img * np.array(voxel_mask, dtype=bool)[...,None]', img = bold_img, voxel_mask = resampled_voxel_mask_img), resampled_voxel_mask_img
 
 class VoxelTimeSeriesMasker(ProcessNode):
     outputs = ("voxel_masker",)

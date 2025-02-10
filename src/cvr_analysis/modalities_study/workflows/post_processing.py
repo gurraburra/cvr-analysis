@@ -98,7 +98,7 @@ data_loader_wf = ProcessWorkflow(
         (bold_loader.output.bold_img, crop_bold_img.input.bold_img),
         # timeseries masker
         (ProcessWorkflow.input._, timeseries_masker.input.all / timeseries_masker.input.voxel_mask_img),
-        (voxel_mask_loader.output.bids_img, timeseries_masker.input.voxel_mask_img),
+        (crop_bold_img.output.resampled_voxel_mask_img, timeseries_masker.input.voxel_mask_img),
         (timeseries_masker.output.timeseries_masker, ProcessWorkflow.output._),
         # get timeseries
         (crop_bold_img.output.cropped_bold_img, get_bold_ts.input.bold_img),
