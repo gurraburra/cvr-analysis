@@ -7,8 +7,8 @@ import pandas as pd
 def getOutputFiles(path):
     analysis_list = []
 
-    optional_fields = {field : None for field in ["ses", "task", "run", "space", "analys", "refinement"]}
-    field_full_name = {"ses" : "session", "analys" : "analysis"}
+    optional_fields = {field : None for field in ["ses", "task", "run", "space", "analys", "refinement", "desc"]}
+    field_full_name = {"ses" : "session", "analys" : "analysis", "desc" : "description"}
 
     def checkOptionalField(field, file, row):
         try:
