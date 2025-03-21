@@ -23,7 +23,7 @@ class LinearRegression(linear_model.LinearRegression):
         self.dof = (X.shape[0] - X.shape[1])
 
         sse = np.sum((self.pred - y) ** 2, axis=0) / self.dof
-        Q = np.linalg.inv(np.dot(X.T, X))
+        Q = np.linalg.pinv(np.dot(X.T, X))
         if sse.ndim == 0:
             se = np.sqrt(np.diagonal(sse * Q))
         else:
