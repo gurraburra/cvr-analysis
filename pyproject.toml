@@ -30,7 +30,7 @@ dynamic = ["version"]
 test = ["matplotlib", "seaborn", "jupyter", "ipywidgets", "ipympl", "wakepy", "openpyxl"]
 
 [project.scripts]
-cvr-modality-study = "cvr_analysis.modalities_study.run:main"
+cvr-analysis = "cvr_analysis.run:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "cvr_analysis._version.__version__"}

@@ -1,1 +1,1 @@
-__version__ = '0.1rc14+dry-paper'
+__version__ = '0.1rc14'
