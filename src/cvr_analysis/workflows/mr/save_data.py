@@ -29,7 +29,7 @@ def createHashCheckOverride(
                                                                     do_dtw, 
                                                                         force_run = False): 
     # folder for files
-    analysis_name = "version-" + __version__ 
+    analysis_name = "MRT-CVR-version-" + __version__ 
     files_folder = os.path.join(output_directory, f"sub-{subject}", f"ses-{session}", analysis_name)
 
     # convert None
