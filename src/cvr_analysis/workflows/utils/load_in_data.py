@@ -5,6 +5,7 @@ import re
 from glob import glob
 import os
 import json
+import numpy as np
 
 def _checkBIDSQuery(file : str, files : list[str]) -> str:
     if len(files) == 0:
@@ -73,11 +74,12 @@ class LoadBOLDData(ProcessNode):
                                         bids_directory,
                                             subject=subject, 
                                                 session=session, 
-                                                    task=task, 
-                                                        run=run, 
-                                                            space=space, 
-                                                                suffix="bold", 
-                                                                    extension=".nii*")))
+                                                    data_type="func",
+                                                        task=task, 
+                                                            run=run, 
+                                                                space=space, 
+                                                                    suffix="bold", 
+                                                                        extension=".nii*")))
         # nr_meas
         nr_meas = bold_img.shape[3]
 
@@ -214,3 +216,85 @@ class GetTimeSeriesEvent(ProcessNode):
             if r is not None:
                 return r
         raise ValueError(f"Could not find time series event '{event_name}'.")
+    
+
+class LoadDopplerData(ProcessNode):
+    outputs = ("times", "mean_tr", "time_unit", "blood_flow_ts", "blood_flow_headers", "blood_flow_units", "events_df")
+    
+    def _run(self, bids_directory : str, subject : str = None, session : str = None, task : str = None, run : str = None, add_global_signal : bool = True) -> dict:
+        # load doppler data
+        doppler_ts = pd.read_csv(
+                        _checkBIDSQuery("Doppler", 
+                            _getBIDSFiles(
+                                        bids_directory,
+                                            subject=subject, 
+                                                session=session, 
+                                                    data_type="doppler",
+                                                        task=task, 
+                                                            run=run, 
+                                                                suffix="doppler", 
+                                                                    extension=".tsv*")),
+                                                                        sep='\t', header=0, index_col=False)
+        # get headers and units
+        headers = []
+        units = []
+        for c in doppler_ts.columns:
+            for p in [r"(.*) \[(.*)\]", r"(.*) \((.*)\)"]:
+                g = re.match(p, c)
+                if g is not None:
+                    headers.append(g.group(1))
+                    units.append(g.group(2))
+                    break
+            # check if no match happened
+            if g is None:
+                headers.append(c)
+                units.append("")
+        # check time in headers
+        assert "time" in headers, "Missing mandatory column 'time' in doppler data file"
+        # get indices for time a blood flow timeseries
+        time_idx = headers.index("time")
+        bf_idxs = list(range(len(headers)))
+        del bf_idxs[time_idx]
+        assert len(bf_idxs) != 0, "No doppler signals in data"
+        # convert to numpy
+        doppler_ts = doppler_ts.to_numpy() 
+        headers = np.array(headers)
+        units = np.array(units)
+        # get timeseries, headers and units
+        doppler_time_ts, header_time, unit_time = doppler_ts[:,time_idx], headers[time_idx], units[time_idx]
+        doppler_bf_ts, headers_bf, units_bf = doppler_ts[:,bf_idxs], headers[bf_idxs], units[bf_idxs]
+        # add global bf ts
+        if add_global_signal:
+            assert np.unique(units_bf) != 1, "Can't add global doppler signal, different units."
+            doppler_bf_ts = np.hstack((doppler_bf_ts, doppler_bf_ts.mean(axis = 1)[:,None]))
+            headers_bf = np.append(headers_bf, "global")
+            units_bf = np.append(units_bf, units_bf[0])
+        
+        # mean tr
+        mean_tr = np.diff(doppler_time_ts).mean()
+
+        # load in events
+        for acq in ["doppler", None]:
+            # try events using acq
+            try:
+                events_df = pd.read_csv(
+                                    _checkBIDSQuery("events", 
+                                        _getBIDSFiles(
+                                            bids_directory, 
+                                                subject=subject, 
+                                                    session=session, 
+                                                        data_type="doppler",
+                                                            task=task, 
+                                                                acq=acq,
+                                                                    run=run, 
+                                                                        suffix="events", 
+                                                                            extension=".tsv")), sep='\t')
+            except ValueError:
+                continue
+            break
+        else:
+            raise ValueError("Could not load events file.")
+
+        
+        
+        return doppler_time_ts, mean_tr, unit_time, doppler_bf_ts, headers_bf, units_bf, events_df 
