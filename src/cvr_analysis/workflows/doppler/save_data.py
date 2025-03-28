@@ -98,13 +98,14 @@ def saveData(
                                 # regressor data
                                     regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
                                         # doppler alignement data
-                                            doppler_postproc_timeseries, doppler_timeshift_maxcorr, doppler_maxcorr, doppler_timeshifts, doppler_correlations,
-                                                doppler_aligned_regressor_timeseries,
-                                                    # doppler regression data
-                                                    doppler_dof, doppler_predictions, doppler_r_squared, doppler_adjusted_r_squared, doppler_tsnr, 
-                                                        doppler_cvr_amplitude, doppler_p_value, regression_down_sampled_sample_time,
-                                                            # full output
-                                                            full_output = False) -> tuple:
+                                            initial_global_regressor_timeshift, refined_global_regressor_timeshift, align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound,
+                                                doppler_postproc_timeseries, doppler_timeshift_maxcorr, doppler_maxcorr, doppler_timeshifts, doppler_correlations,
+                                                    doppler_aligned_regressor_timeseries, 
+                                                        # doppler regression data
+                                                        doppler_dof, doppler_predictions, doppler_r_squared, doppler_adjusted_r_squared, doppler_tsnr, 
+                                                            doppler_cvr_amplitude, doppler_p_value, regression_down_sampled_sample_time,
+                                                                # full output
+                                                                full_output = False) -> tuple:
         
         # make output folder if not exist
         path_folder = Path(os.path.split(analysis_file)[0])
@@ -147,20 +148,23 @@ def saveData(
         # 1D data
         data_info = {
                     # pre-processing data
-                    "subject"                           : subject,
-                    "session"                           : session,
-                    "task"                              : task,
-                    "run"                               : run, 
-                    "doppler-tr"                        : doppler_tr,
-                    # post-processing data
-                    "up-sampling-factor"                : up_sampling_factor,
-                    "up-sampled-sample-time"            : up_sampled_sample_time,
-                    "regressor-name"                    : regressor_event_name,
-                    # regressor data
-                    "regressor-rms"                     : regressor_rms,
-                    # doppler alignment data
-                    "align-regressor-time-step"         : up_sampled_sample_time,
-                    "align-regressor-start-time"        : doppler_timeshifts[0,0],
+                    "subject"                               : subject,
+                    "session"                               : session,
+                    "task"                                  : task,
+                    "run"                                   : run, 
+                    "doppler-tr"                            : doppler_tr,
+                    # post-processing data  
+                    "up-sampling-factor"                    : up_sampling_factor,
+                    "up-sampled-sample-time"                : up_sampled_sample_time,
+                    "regressor-name"                        : regressor_event_name,
+                    # regressor data    
+                    "regressor-rms"                         : regressor_rms,
+                    # doppler alignment data    
+                    "initial-global-regressor-timeshift"    : initial_global_regressor_timeshift,
+                    "refined-global-regressor-timeshift"    : refined_global_regressor_timeshift,
+                    "align-regressor-absolute-bounds"       : (align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound),
+                    "align-regressor-time-step"             : up_sampled_sample_time,
+                    "align-regressor-start-time"            : doppler_timeshifts[0,0],
                 }
         with open(preamble + "desc-data_info.json", "w") as info_file:
             json.dump(data_info, info_file, indent='\t')

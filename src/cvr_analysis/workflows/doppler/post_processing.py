@@ -88,33 +88,34 @@ resample_wf = ProcessWorkflow(
 
 # %%
 ##############################################
-# align regressor to global
+# initial align regressor to global for time limit to work
 ##############################################
 # global regressor correlate
-global_regressor_correlate = Correlate(description="global regressor correlate")
+initial_global_regressor_correlate = Correlate(description="global regressor correlate")
 # global regressor align
-global_regressor_align = AlignTimeSeries(description="global align regressor")
-global_regressor_align_wf = ProcessWorkflow(
+initial_global_regressor_align = AlignTimeSeries(description="global align regressor")
+initial_global_regressor_align_wf = ProcessWorkflow(
     (
         # global align regressor 
-        (ProcessWorkflow.input.sample_time, global_regressor_correlate.input.time_step),
-        (ProcessWorkflow.input.global_align_regressor_lower_bound, global_regressor_correlate.input.lower_limit),
-        (ProcessWorkflow.input.global_align_regressor_upper_bound, global_regressor_correlate.input.upper_limit),
-        (ProcessWorkflow.input.correlation_window, global_regressor_correlate.input.window),
-        (ProcessWorkflow.input.correlation_phat, global_regressor_correlate.input.phat),
-        (ValueNode(0.0).output.value, global_regressor_correlate.input.peak_threshold),
-        (ValueNode("max").output.value, global_regressor_correlate.input.multi_peak_strategy),
-        (ValueNode(0.0).output.value, global_regressor_correlate.input.ref_timeshift),
-        (ValueNode(False).output.value, global_regressor_correlate.input.bipolar),
-        (ProcessWorkflow.input.doppler_timeseries.mean(axis = 1) - ProcessWorkflow.input.doppler_timeseries.mean() , global_regressor_correlate.input.signal_timeseries_a),
-        (ProcessWorkflow.input.regressor_timeseries - ProcessWorkflow.input.regressor_timeseries.mean(), global_regressor_correlate.input.signal_timeseries_b),
+        (ProcessWorkflow.input.sample_time, initial_global_regressor_correlate.input.time_step),
+        (ProcessWorkflow.input.global_align_regressor_lower_bound, initial_global_regressor_correlate.input.lower_limit),
+        (ProcessWorkflow.input.global_align_regressor_upper_bound, initial_global_regressor_correlate.input.upper_limit),
+        (ProcessWorkflow.input.correlation_window, initial_global_regressor_correlate.input.window),
+        (ProcessWorkflow.input.correlation_phat, initial_global_regressor_correlate.input.phat),
+        (ValueNode(0.0).output.value, initial_global_regressor_correlate.input.peak_threshold),
+        (ValueNode("max").output.value, initial_global_regressor_correlate.input.multi_peak_strategy),
+        (ValueNode(0.0).output.value, initial_global_regressor_correlate.input.ref_timeshift),
+        (ValueNode(False).output.value, initial_global_regressor_correlate.input.bipolar),
+        (ProcessWorkflow.input.doppler_timeseries.mean(axis = 1) - ProcessWorkflow.input.doppler_timeseries.mean() , initial_global_regressor_correlate.input.signal_timeseries_a),
+        (ProcessWorkflow.input.regressor_timeseries - ProcessWorkflow.input.regressor_timeseries.mean(), initial_global_regressor_correlate.input.signal_timeseries_b),
         # align regressor to global
-        (ProcessWorkflow.input.sample_time, global_regressor_align.input.time_step),
-        (ProcessWorkflow.input.doppler_timeseries.shape[0], global_regressor_align.input.length),
-        (ProcessWorkflow.input.regressor_timeseries, global_regressor_align.input.timeseries),
-        (global_regressor_correlate.output.timeshift_maxcorr, global_regressor_align.input.timeshift),
-        (ValueNode(False).output.value, global_regressor_align.input.fill_nan),
-        (global_regressor_align.output.aligned_timeseries, ProcessWorkflow.output.global_aligned_regressor_timeseries),
+        (ProcessWorkflow.input.sample_time, initial_global_regressor_align.input.time_step),
+        (ProcessWorkflow.input.doppler_timeseries.shape[0], initial_global_regressor_align.input.length),
+        (ProcessWorkflow.input.regressor_timeseries, initial_global_regressor_align.input.timeseries),
+        (initial_global_regressor_correlate.output.timeshift_maxcorr, initial_global_regressor_align.input.timeshift),
+        (ValueNode(False).output.value, initial_global_regressor_align.input.fill_nan),
+        (initial_global_regressor_correlate.output.timeshift_maxcorr, ProcessWorkflow.output.initial_global_regressor_timeshift),
+        (initial_global_regressor_align.output.aligned_timeseries, ProcessWorkflow.output.initial_global_aligned_regressor_timeseries),
     ), description="global regressor align wf"
 )
 
@@ -217,16 +218,17 @@ signal_processing_wf = ProcessWorkflow(
         (detrend_wf.output.detrended_doppler_timeseries, temporal_filter_wf.input.doppler_timeseries),
         (detrend_wf.output.detrended_regressor_timeseries, temporal_filter_wf.input.regressor_timeseries),
         # global align regressor
-        (ProcessWorkflow.input._, global_regressor_align_wf.input[("correlation_phat", "correlation_window", "global_align_regressor_lower_bound", "global_align_regressor_upper_bound")]),
-        (resample_wf.output.new_sample_time, global_regressor_align_wf.input.sample_time),
-        (temporal_filter_wf.output.temporal_filtered_doppler_timeseries, global_regressor_align_wf.input.doppler_timeseries),
-        (temporal_filter_wf.output.temporal_filtered_regressor_timeseries, global_regressor_align_wf.input.regressor_timeseries),
+        (ProcessWorkflow.input._, initial_global_regressor_align_wf.input[("correlation_phat", "correlation_window", "global_align_regressor_lower_bound", "global_align_regressor_upper_bound")]),
+        (resample_wf.output.new_sample_time, initial_global_regressor_align_wf.input.sample_time),
+        (temporal_filter_wf.output.temporal_filtered_doppler_timeseries, initial_global_regressor_align_wf.input.doppler_timeseries),
+        (temporal_filter_wf.output.temporal_filtered_regressor_timeseries, initial_global_regressor_align_wf.input.regressor_timeseries),
+        (initial_global_regressor_align_wf.output.initial_global_regressor_timeshift, ProcessWorkflow.output._),
         # time limit wf
         (ProcessWorkflow.input.analysis_start_time, time_limit_wf.input.analysis_start_time),
         (ProcessWorkflow.input.analysis_end_time, time_limit_wf.input.analysis_end_time),
         (resample_wf.output.new_sample_time, time_limit_wf.input.sample_time),
         (temporal_filter_wf.output.temporal_filtered_doppler_timeseries, time_limit_wf.input.doppler_timeseries),
-        (global_regressor_align_wf.output.global_aligned_regressor_timeseries, time_limit_wf.input.regressor_timeseries),
+        (initial_global_regressor_align_wf.output.initial_global_aligned_regressor_timeseries, time_limit_wf.input.regressor_timeseries),
         (time_limit_wf.output.time_limited_doppler_timeseries, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_doppler_timeseries),
         (time_limit_wf.output.time_limited_regressor_timeseries, ProcessWorkflow.output.time_limited_global_aligned_temporal_filtered_detrended_up_sampled_regressor_timeseries),
     ),
