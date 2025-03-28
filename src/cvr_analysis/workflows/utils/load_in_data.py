@@ -60,7 +60,9 @@ def _getBIDSFiles(bids_directory, subject, session=None, data_type=None, task=No
         file_spec += f"{extension}"
     elif file_spec[-1] != '*':
         file_spec += '*'
-    return glob(os.path.join(base_dir, file_spec))
+    # seach pattern
+    search_pattern = os.path.join(base_dir, file_spec)
+    return glob(search_pattern)
     
 
 class LoadBOLDData(ProcessNode):
@@ -233,7 +235,7 @@ class LoadDopplerData(ProcessNode):
                                                         task=task, 
                                                             run=run, 
                                                                 suffix="doppler", 
-                                                                    extension=".tsv*")),
+                                                                    extension=".tsv")),
                                                                         sep='\t', header=0, index_col=False)
         # get headers and units
         headers = []
