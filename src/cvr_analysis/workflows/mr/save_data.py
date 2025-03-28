@@ -131,13 +131,13 @@ def saveData(
                     voxel_mask_img, timeseries_masker, bold_tr, co2_event_name,
                         up_sampling_factor, up_sampled_sample_time,
                             # regressor co2 data
-                                regressor_preproc_timeseries, regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
+                                regressor_postproc_timeseries, regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
                                     regressor_aligned_co2_timeseries, co2_rms, co2_autocorrelation_timeshifts, co2_autocorrelation_correlations, 
                                         regressor_co2_timeshift_maxcorr, regressor_co2_maxcorr, regressor_co2_timeshifts, regressor_co2_correlations, 
                                             regressor_co2_beta,
                                                 # bold alignement data
                                                 reference_regressor_timeshift, align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound,
-                                                    bold_preproc_timeseries, bold_timeshift_maxcorr, bold_maxcorr, bold_timeshifts, bold_correlations,
+                                                    bold_postproc_timeseries, bold_timeshift_maxcorr, bold_maxcorr, bold_timeshifts, bold_correlations,
                                                         bold_aligned_regressor_timeseries,
                                                             # bold regression data
                                                             bold_dof, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_tsnr, 
@@ -152,7 +152,7 @@ def saveData(
         preamble = analysis_file.split("desc-")[0]
         # 4D data
         if full_output:
-            timeseries_masker.inverse_transform(bold_preproc_timeseries.T).to_filename(preamble + "desc-preproc_bold.nii.gz")
+            timeseries_masker.inverse_transform(bold_postproc_timeseries.T).to_filename(preamble + "desc-postproc_bold.nii.gz")
             timeseries_masker.inverse_transform(bold_correlations.T).to_filename(preamble + "desc-correlations_map.nii.gz")
             timeseries_masker.inverse_transform(bold_aligned_regressor_timeseries.T).to_filename(preamble + "desc-alignedRegressor_map.nii.gz")
             timeseries_masker.inverse_transform(bold_predictions.T).to_filename(preamble + "desc-predictions_bold.nii.gz")
@@ -174,7 +174,7 @@ def saveData(
                     json.dump(dict_, file, indent='\t')
             # regressor co2
             saveTimeseriesInfo(preamble + "desc-regressorAlignedCO2Series_timeseries.json", 0, regression_down_sampled_sample_time)
-            pd.DataFrame(np.vstack((regressor_preproc_timeseries, regressor_aligned_co2_timeseries)).T, columns=["regressor_series", "aligned_co2_series"]).to_csv(preamble + "desc-regressorAlignedCO2Series_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
+            pd.DataFrame(np.vstack((regressor_postproc_timeseries, regressor_aligned_co2_timeseries)).T, columns=["regressor_series", "aligned_co2_series"]).to_csv(preamble + "desc-regressorAlignedCO2Series_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
             # regressor autocorrelation
             saveTimeseriesInfo(preamble + "desc-regressorAutocorrelations_timeseries.json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
             pd.Series(regressor_autocorrelation_correlations).to_csv(preamble + "desc-regressorAutocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")

@@ -35,7 +35,7 @@ cvr_analysis_wf = ProcessWorkflow(
         (regression_wf.output.regressor_signal_rms, conditionally_save_data.input.regressor_rms),
         (regression_wf.output.regressor_signal_autocorrelation_timeshifts, conditionally_save_data.input.regressor_autocorrelation_timeshifts),
         (regression_wf.output.regressor_signal_autocorrelation_correlations, conditionally_save_data.input.regressor_autocorrelation_correlations),
-        (regression_wf.output.dopplerIter_down_sampled_doppler_signal_ts, conditionally_save_data.input.doppler_preproc_timeseries),
+        (regression_wf.output.dopplerIter_down_sampled_doppler_signal_ts, conditionally_save_data.input.doppler_postproc_timeseries),
         (regression_wf.output.dopplerIter_timeshift_maxcorr, conditionally_save_data.input.doppler_timeshift_maxcorr),
         (regression_wf.output.dopplerIter_maxcorr, conditionally_save_data.input.doppler_maxcorr),
         (regression_wf.output.dopplerIter_timeshifts, conditionally_save_data.input.doppler_timeshifts),

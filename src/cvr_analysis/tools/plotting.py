@@ -198,7 +198,7 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
     # get bold data
     if "bold" in data_include:
         try:
-            bold_img = image.load_img(os.path.join(folder, preamble + "_desc-preproc_bold.nii.gz"))
+            bold_img = image.load_img(os.path.join(folder, preamble + "_desc-postproc_bold.nii.gz"))
             data.append((norm_func(bold_img.get_fdata()), "bold"))
         except:
             print("No bold img found")

@@ -30,7 +30,7 @@ cvr_analysis_wf = ProcessWorkflow(
         (post_processing_wf.output.up_sampled_sample_time, conditionally_save_data.input.up_sampled_sample_time),
         (post_processing_wf.output.co2_event_name, conditionally_save_data.input.co2_event_name),
         # regression data
-        (regression_wf.output.down_sampled_regressor_signal_timeseries, conditionally_save_data.input.regressor_preproc_timeseries),
+        (regression_wf.output.down_sampled_regressor_signal_timeseries, conditionally_save_data.input.regressor_postproc_timeseries),
         (regression_wf.output.regressor_signal_rms, conditionally_save_data.input.regressor_rms),
         (regression_wf.output.regressor_signal_autocorrelation_timeshifts, conditionally_save_data.input.regressor_autocorrelation_timeshifts),
         (regression_wf.output.regressor_signal_autocorrelation_correlations, conditionally_save_data.input.regressor_autocorrelation_correlations),
@@ -46,7 +46,7 @@ cvr_analysis_wf = ProcessWorkflow(
         (regression_wf.output.regressor_co2_beta, conditionally_save_data.input.regressor_co2_beta),
         (regression_wf.output.align_regressor_absolute_lower_bound, conditionally_save_data.input.align_regressor_absolute_lower_bound),
         (regression_wf.output.align_regressor_absolute_upper_bound, conditionally_save_data.input.align_regressor_absolute_upper_bound),
-        (regression_wf.output.boldIter_down_sampled_bold_signal_ts, conditionally_save_data.input.bold_preproc_timeseries),
+        (regression_wf.output.boldIter_down_sampled_bold_signal_ts, conditionally_save_data.input.bold_postproc_timeseries),
         (regression_wf.output.boldIter_timeshift_maxcorr, conditionally_save_data.input.bold_timeshift_maxcorr),
         (regression_wf.output.boldIter_maxcorr, conditionally_save_data.input.bold_maxcorr),
         (regression_wf.output.boldIter_timeshifts, conditionally_save_data.input.bold_timeshifts),

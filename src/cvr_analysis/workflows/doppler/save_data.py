@@ -98,7 +98,7 @@ def saveData(
                                 # regressor data
                                     regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
                                         # doppler alignement data
-                                            doppler_preproc_timeseries, doppler_timeshift_maxcorr, doppler_maxcorr, doppler_timeshifts, doppler_correlations,
+                                            doppler_postproc_timeseries, doppler_timeshift_maxcorr, doppler_maxcorr, doppler_timeshifts, doppler_correlations,
                                                 doppler_aligned_regressor_timeseries,
                                                     # doppler regression data
                                                     doppler_dof, doppler_predictions, doppler_r_squared, doppler_adjusted_r_squared, doppler_tsnr, 
@@ -113,10 +113,10 @@ def saveData(
         preamble = analysis_file.split("desc-")[0]
         # 2D data
         if full_output:
-            pd.DataFrame(doppler_preproc_timeseries.T).to_csv(preamble + "desc-preproc_doppler.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
-            pd.DataFrame(doppler_correlations.T).to_csv(preamble + "desc-correlations_map.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
-            pd.DataFrame(doppler_aligned_regressor_timeseries.T).to_csv(preamble + "desc-alignedRegressor_map.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
-            pd.DataFrame(doppler_predictions.T).to_csv(preamble + "desc-predictions_doppler.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+            pd.DataFrame(doppler_postproc_timeseries.T, columns=doppler_headers).to_csv(preamble + "desc-postproc_doppler.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+            pd.DataFrame(doppler_predictions.T, columns=doppler_headers).to_csv(preamble + "desc-predictions_doppler.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+            pd.DataFrame(doppler_correlations.T, columns=doppler_headers).to_csv(preamble + "desc-correlations_timeseries.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+            pd.DataFrame(doppler_aligned_regressor_timeseries.T, columns=doppler_headers).to_csv(preamble + "desc-alignedRegressor_timeseries.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
         # dataframe data
         df_dict = {
             "signal" : doppler_headers,
@@ -127,10 +127,10 @@ def saveData(
             "std" : doppler_stds,
             "cvr" : doppler_cvr_amplitude,
             "timeshift" : doppler_timeshift_maxcorr,
-            "pvalue" : doppler_p_value,
-            "rsquared" : doppler_r_squared,
             "maxcorr" : doppler_maxcorr,
+            "pvalue" : doppler_p_value,
             "dof" : doppler_dof,
+            "rsquared" : doppler_r_squared,
             "adj_rsquared" : doppler_adjusted_r_squared,
         }
         pd.DataFrame(df_dict).to_csv(preamble + "desc-cvr_stats.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
