@@ -30,7 +30,7 @@ class LinearRegression(linear_model.LinearRegression):
             se = np.array([
                             np.sqrt(np.diagonal(sse[i] * Q))
                             for i in range(sse.shape[0])
-                        ])
+                        ]).T
         self.se = se
         self.t = self.coef_ / self.se
         self.p = 2 * (1 - stats.t.cdf(np.abs(self.t), self.dof))
