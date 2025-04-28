@@ -3,9 +3,9 @@ import numpy as np
 
 # process control
 from process_control import *
-from cvr_analysis.modalities_study.workflows.utils.signal_processing import DownsampleTimeSeries, MaskTimeSeries, DTW
-from cvr_analysis.modalities_study.workflows.utils.data_computation import Correlate, AlignTimeSeries, RegressCVR, PercentageChangeTimeSeries, StandardizeTimeSeries, BaselineTimeSeries, RMSTimeSeries, FilterTimeshifts, PCAReducedTimeSeries, HistPeak
-from cvr_analysis.modalities_study.workflows.utils.confounds import MotionConfounds
+from cvr_analysis.legacy.modalities_study.workflows.utils.signal_processing import DownsampleTimeSeries, MaskTimeSeries, DTW
+from cvr_analysis.legacy.modalities_study.workflows.utils.data_computation import Correlate, AlignTimeSeries, RegressCVR, PercentageChangeTimeSeries, StandardizeTimeSeries, BaselineTimeSeries, RMSTimeSeries, FilterTimeshifts, PCAReducedTimeSeries, HistPeak
+from cvr_analysis.legacy.modalities_study.workflows.utils.confounds import MotionConfounds
 
 # %%
 

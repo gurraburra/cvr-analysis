@@ -385,7 +385,7 @@ def main():
     iters = iters[np.lexsort(np.vectorize(str)(iters[:,::-1].T))]
 
     # load in from separate module
-    from cvr_analysis.modalities_study.setup_wf import cvr_wf
+    from cvr_analysis.legacy.modalities_study.setup_wf import cvr_wf
 
     # print
     print("----- CVR analysis -----")

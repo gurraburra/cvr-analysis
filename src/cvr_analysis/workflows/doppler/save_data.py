@@ -127,7 +127,7 @@ def saveData(
             "min" : doppler_mins,
             "std" : doppler_stds,
             "cvr" : doppler_cvr_amplitude,
-            "timeshift" : doppler_timeshift_maxcorr,
+            "timeshift" : doppler_timeshift_maxcorr + initial_global_regressor_timeshift, # add initial timeshift 
             "maxcorr" : doppler_maxcorr,
             "pvalue" : doppler_p_value,
             "dof" : doppler_dof,
@@ -162,6 +162,7 @@ def saveData(
                     # doppler alignment data    
                     "initial-global-regressor-timeshift"    : initial_global_regressor_timeshift,
                     "refined-global-regressor-timeshift"    : refined_global_regressor_timeshift,
+                    "total-global-regressor-timeshift"      : initial_global_regressor_timeshift + refined_global_regressor_timeshift,
                     "align-regressor-absolute-bounds"       : (align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound),
                     "align-regressor-time-step"             : up_sampled_sample_time,
                     "align-regressor-start-time"            : doppler_timeshifts[0,0],

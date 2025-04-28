@@ -4,9 +4,9 @@ import numpy as np
 # process control
 from process_control import *
 # custom packages
-from cvr_analysis.modalities_study.workflows.utils.load_in_data import LoadBOLDData, LoadBidsImg, CropBOLDImg, VoxelTimeSeriesMasker, RoiTimeSeriesMasker, GetTimeSeriesEvent
-from cvr_analysis.modalities_study.workflows.utils.signal_processing import NewSampleTime, ResampleTimeSeries, DetrendTimeSeries, TemporalFilterTimeSeries, TimeLimitTimeSeries
-from cvr_analysis.modalities_study.workflows.utils.data_computation import Correlate, AlignTimeSeries
+from cvr_analysis.legacy.modalities_study.workflows.utils.load_in_data import LoadBOLDData, LoadBidsImg, CropBOLDImg, VoxelTimeSeriesMasker, RoiTimeSeriesMasker, GetTimeSeriesEvent
+from cvr_analysis.legacy.modalities_study.workflows.utils.signal_processing import NewSampleTime, ResampleTimeSeries, DetrendTimeSeries, TemporalFilterTimeSeries, TimeLimitTimeSeries
+from cvr_analysis.legacy.modalities_study.workflows.utils.data_computation import Correlate, AlignTimeSeries
 
 # %%
 

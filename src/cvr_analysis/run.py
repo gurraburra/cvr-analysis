@@ -50,7 +50,7 @@ def main():
     parser.add_argument('--nprocs', type=int, default=-1, help='number of cpus to be used')
     parser.add_argument('--omp-threads', '--nthreads-per-proc', type=partial(handleNone, int), help='number of threads per process')
     parser.add_argument('--force-run', action='store_true', help='flag specifing if old data files should be overriden')
-    parser.add_argument('--full-output', action='store_true', help='flag specifing if all output files should be saved')
+    parser.add_argument('--data-to-save', action='store_true', help='flag specifing if all output files should be saved')
     parser.add_argument('--verbose', action='store_true', help='verbose printing or not')
     
     # subject
@@ -422,7 +422,7 @@ def main():
 
             # run workflow
             cvr_wf.run(ignore_cache = False, save_data = True, nr_parallel_processes = nprocs,
-                                bids_dir = args.bids_dir, verbose = args.verbose, force_run = args.force_run, full_output = args.full_output, output_directory = args.output_dir, 
+                                bids_dir = args.bids_dir, verbose = args.verbose, force_run = args.force_run, data_to_save = args.data_to_save, output_directory = args.output_dir, 
                                         **iter_args_dict)
 
     # done

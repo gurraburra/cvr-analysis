@@ -12,7 +12,7 @@ from scipy.ndimage import median_filter, uniform_filter, spline_filter, label, g
 from nilearn import image
 from sklearn.decomposition import PCA
 from functools import partial
-from cvr_analysis.modalities_study.workflows.utils._extended_sklearn_linreg import LinearRegression
+from cvr_analysis.legacy.modalities_study.workflows.utils._extended_sklearn_linreg import LinearRegression
 
 class BaselinePlateau(ProcessNode):
     """

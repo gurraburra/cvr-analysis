@@ -416,7 +416,7 @@ regressor_co2_regression_wf = ProcessWorkflow(
         # regress
         (ProcessWorkflow.input.down_sampled_regression_confounds_signal_df, regressor_co2_regression.input.confounds_df),
         (ProcessWorkflow.input.confound_regressor_correlation_threshold, regressor_co2_regression.input.confound_regressor_correlation_threshold),
-        (regressor_co2_align_downsample.output.down_sampled_ref_timeseries, regressor_co2_regression.input.bold_ts),
+        (regressor_co2_align_downsample.output.down_sampled_ref_timeseries, regressor_co2_regression.input.dv_ts),
         (regressor_co2_align_downsample.output.down_sampled_aligned_timeseries, regressor_co2_regression.input.regressor_timeseries),
         (regressor_co2_regression.output.all / regressor_co2_regression.output["design_matrix", "betas", "predictions"], ProcessWorkflow.output._),
     ),
@@ -500,7 +500,7 @@ iterate_cvr_align_downsample = IteratingNode(align_downsample_wf.copy(), iterati
 ##############################################
 # iterate calculate cvr over bold timeseries
 ##############################################
-iterate_cvr_regress = IteratingNode(RegressCVR(), iterating_inputs=("bold_ts", "regressor_timeseries"), iterating_name="bold", exclude_outputs=("design_matrix", "betas"), description="iterate cvr – regress").setDefaultInputs(boldIter_nr_parallel_processes = -1)
+iterate_cvr_regress = IteratingNode(RegressCVR(), iterating_inputs=("dv_ts", "regressor_timeseries"), iterating_name="bold", exclude_outputs=("design_matrix", "betas"), description="iterate cvr – regress").setDefaultInputs(boldIter_nr_parallel_processes = -1)
 
 # %%
 iterate_cvr_wf = ProcessWorkflow(
@@ -541,7 +541,7 @@ iterate_cvr_wf = ProcessWorkflow(
         (ProcessWorkflow.input.show_pbar, iterate_cvr_regress.input.boldIter_show_pbar),
         (ProcessWorkflow.input.down_sampled_regression_confounds_signal_df, iterate_cvr_regress.input.confounds_df),
         (ProcessWorkflow.input.confound_regressor_correlation_threshold, iterate_cvr_regress.input.confound_regressor_correlation_threshold),
-        (iterate_cvr_align_downsample.output.boldIter_down_sampled_ref_timeseries, iterate_cvr_regress.input.boldIter_bold_ts),
+        (iterate_cvr_align_downsample.output.boldIter_down_sampled_ref_timeseries, iterate_cvr_regress.input.boldIter_dv_ts),
         (iterate_cvr_align_downsample.output.boldIter_down_sampled_aligned_timeseries, iterate_cvr_regress.input.boldIter_regressor_timeseries),
         (iterate_cvr_regress.output.all - iterate_cvr_regress.output.boldIter_predictions, ProcessWorkflow.output._),
         (iterate_cvr_regress.output.boldIter_predictions, ProcessWorkflow.output.boldIter_down_sampled_bold_signal_predictions)

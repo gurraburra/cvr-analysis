@@ -429,17 +429,17 @@ class RegressCVR(ProcessNode):
     """
     Performs linear regression between regressir data och bold data.
     """
-    outputs = ("dof", "betas", "predictions", "regressor_beta", "regressor_t", "regressor_p", "design_matrix", "r_squared", "adjusted_r_squared", "tsnr")
+    outputs = ("dof", "betas", "predictions", "regressor_beta", "regressor_se", "regressor_t", "regressor_p", "design_matrix", "r_squared", "adjusted_r_squared")
 
-    def _run(self, bold_ts : np.ndarray, regressor_timeseries : np.ndarray, confounds_df : pd.DataFrame = None, confound_regressor_correlation_threshold : float = None) -> tuple:
+    def _run(self, dv_ts : np.ndarray, regressor_timeseries : np.ndarray, confounds_df : pd.DataFrame = None, confound_regressor_correlation_threshold : float = None) -> tuple:
         # check regressor
         if regressor_timeseries is None:
-            regressor_timeseries = pd.DataFrame([], index = range(len(bold_ts)))
+            regressor_timeseries = pd.DataFrame([], index = range(len(dv_ts)))
         else:
             regressor_timeseries = pd.Series(regressor_timeseries, name = "regressor")
         # check confounds_df
         if confounds_df is None:
-            confounds_df = pd.DataFrame([], index = range(len(bold_ts)))
+            confounds_df = pd.DataFrame([], index = range(len(dv_ts)))
         else:
             confounds_df = pd.DataFrame(confounds_df)
         # create design matrix
@@ -452,30 +452,35 @@ class RegressCVR(ProcessNode):
         # make sure columns are string
         design_matrix.columns = design_matrix.columns.astype(str)
         # find nan rows
-        nan_entries = design_matrix.isna().any(axis=1) | np.isnan(bold_ts)
+        nan_entries = design_matrix.isna().any(axis=1) | np.isnan(dv_ts)
         # check if no valid entries
         if np.all(nan_entries):
             # return all nans
-            return 0, np.full(design_matrix.shape[1], np.nan), np.full_like(bold_ts, np.nan), np.nan, np.nan, np.nan, design_matrix, np.nan, np.nan, np.nan
+            return 0, np.full(design_matrix.shape[1], np.nan), np.full_like(dv_ts, np.nan), np.nan, np.nan, np.nan, design_matrix, np.nan, np.nan, np.nan
         non_nan_dm = design_matrix[~nan_entries]
-        non_nan_bs = bold_ts[~nan_entries]
-        # threshold conofunds
+        non_nan_bs = dv_ts[~nan_entries]
+        # threshold confunds
         if confound_regressor_correlation_threshold is not None and not confounds_df.empty and not regressor_timeseries.empty:
-            # get standardized confounds
-            confounds = non_nan_dm[confounds_df.columns].to_numpy()
-            confounds = (confounds - confounds.mean(axis = 0)) / confounds.std(axis = 0)
+            # filter out protected non_protected_confounds
+            protected_confound_names = []
+            protected_confound_names.extend(list(filter(lambda x : x.startswith("spike"), confounds_df.columns)))
+            non_protected_confound_names = confounds_df.columns[~confounds_df.columns.isin(protected_confound_names)]
+            # get standardized non_protected_confounds
+            non_protected_confounds = non_nan_dm[non_protected_confound_names].to_numpy()
+            non_protected_confounds = (non_protected_confounds - non_protected_confounds.mean(axis = 0)) / non_protected_confounds.std(axis = 0)
             # get standardized regressor
             regressor = non_nan_dm["regressor"].to_numpy()
             regressor = (regressor - regressor.mean(axis = 0)) / regressor.std(axis = 0)
-            # calculate correlation between regressor and confounds
-            confound_corr = confounds.T @ regressor / len(regressor) 
+            # calculate correlation between regressor and non_protected_confounds
+            non_protected_confound_corr = non_protected_confounds.T @ regressor / len(regressor) 
             # threshold
-            confounds_above_thr = confounds_df.columns[np.abs(confound_corr) > confound_regressor_correlation_threshold]
+            non_protected_confounds_above_thr = non_protected_confound_names[np.abs(non_protected_confound_corr) > confound_regressor_correlation_threshold]
             # drop
-            design_matrix = design_matrix.drop(columns = confounds_above_thr)
-            non_nan_dm = non_nan_dm.drop(columns = confounds_above_thr)
+            design_matrix = design_matrix.drop(columns = non_protected_confounds_above_thr)
+            non_nan_dm = non_nan_dm.drop(columns = non_protected_confounds_above_thr)
         # get dimensions
         n, p = non_nan_dm.shape
+        dof = n - p
         # regress
         reg = LinearRegression(fit_intercept=False).fit(non_nan_dm, non_nan_bs)
         betas = reg.coef_
@@ -484,19 +489,19 @@ class RegressCVR(ProcessNode):
         # r_squared
         r_squared = r2_score(non_nan_bs, non_nan_pred)
         # adjusted r-squared
-        if n - p - 1 > 0:
-            adjusted_r_squared = 1 - (1 - r_squared) * (n - 1) / (n - p - 1)
+        if dof - 1 > 0:
+            adjusted_r_squared = 1 - (1 - r_squared) * (n - 1) / (dof - 1)
         else:
             adjusted_r_squared = 0
         # tsnr
-        residual_sum_of_squares = np.sum((non_nan_bs - non_nan_pred)**2)
+        # residual_sum_of_squares = np.sum((non_nan_bs - non_nan_pred)**2)
         # the baseline mean signal is 100 since we assume the bold signal has been normed by the basline and multiplied by 100
-        tsnr = 100 / np.sqrt(residual_sum_of_squares / n) if residual_sum_of_squares > 0 else np.nan
+        # tsnr = 100 / np.sqrt(residual_sum_of_squares / n) if residual_sum_of_squares > 0 else np.nan
         # regressor beta, t- and p-value
         if not regressor_timeseries.empty:
             reg_idx = design_matrix.columns.get_loc("regressor")
-            regressor_beta, regressor_t, regressor_p = betas[reg_idx], reg.t[reg_idx], reg.p[reg_idx]
+            regressor_beta, regressor_se, regressor_t, regressor_p = betas[reg_idx], reg.se[reg_idx], reg.t[reg_idx], reg.p[reg_idx]
         else:
-            regressor_beta, regressor_t, regressor_p = np.nan, np.nan, np.nan
+            regressor_beta, regressor_se, regressor_t, regressor_p = np.nan, np.nan, np.nan, np.nan
         # return
-        return n - p, betas, pred, regressor_beta, regressor_t, regressor_p, design_matrix, r_squared, adjusted_r_squared, tsnr
+        return dof, betas, pred, regressor_beta, regressor_se, regressor_t, regressor_p, design_matrix, r_squared, adjusted_r_squared

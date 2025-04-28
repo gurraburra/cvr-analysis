@@ -138,7 +138,7 @@ def maxMinNorm(sig):
 
 norm_funcs = {"stand" : stand, "maxMin" : maxMinNorm, None : lambda x : x}
 
-def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_transform = None, norm : str = "maxMin", data_include = "bold+regressor+predictions", ensure_uniform_sampling = True, **custom_settings):
+def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_transform = None, norm : str = "maxMin", data_include = "bold+regressor+predictions", ensure_uniform_sampling = True, non_zero_mask = False, **custom_settings):
     # settings
     settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower", 'interpolation' : 'antialiased'}
     settings.update(custom_settings)
@@ -198,7 +198,7 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
     # get bold data
     if "bold" in data_include:
         try:
-            bold_img = image.load_img(os.path.join(folder, preamble + "_desc-preproc_bold.nii.gz"))
+            bold_img = image.load_img(os.path.join(folder, preamble + "_desc-postproc_bold.nii.gz"))
             data.append((norm_func(bold_img.get_fdata()), "bold"))
         except:
             print("No bold img found")
@@ -229,9 +229,12 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
             print("No correlation img found")
     # get voxel mask
     try:
-        with open(os.path.join(folder, preamble + "_desc-data_info.json"), "r") as file:
-            data_info = json.load(file)
-        voxel_mask_img = image.resample_to_img(data_info['voxel-mask-file'], cvr_img, force_resample=True, interpolation="nearest")
+        if non_zero_mask:
+            voxel_mask_img = image.math_img("~np.isclose(img,0)", img = cvr_img)
+        else:
+            with open(os.path.join(folder, preamble + "_desc-data_info.json"), "r") as file:
+                data_info = json.load(file)
+            voxel_mask_img = image.resample_to_img(data_info['voxel-mask-file'], cvr_img, force_resample=True, interpolation="nearest")
         voxel_mask = np.ma.masked_where(voxel_mask_img.get_fdata(), voxel_mask_img.get_fdata())
         # voxel_mask = None
     except:

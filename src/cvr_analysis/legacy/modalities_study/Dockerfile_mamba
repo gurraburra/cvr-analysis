@@ -37,4 +37,4 @@ RUN pip install git+https://github.com/gurraburra/cvr-analysis@dry-paper
 WORKDIR /app
 
 ENTRYPOINT ["mamba", "run", "--no-capture-output", "-n", "cvr", "cvr-modality-study"]
-# ENTRYPOINT ["mamba", "run", "--no-capture-output", "-n", "cvr", "python", "-m", "cvr_analysis.modalities_study.run"]
+# ENTRYPOINT ["mamba", "run", "--no-capture-output", "-n", "cvr", "python", "-m", "cvr_analysis.legacy.modalities_study.run"]

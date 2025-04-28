@@ -1,8 +1,8 @@
 # %%
 from process_control import ProcessWorkflow, ConditionalNode, ValueNode, _and_, _or_, not_
-from cvr_analysis.modalities_study.workflows.post_processing import post_processing_wf
-from cvr_analysis.modalities_study.workflows.regression import regression_wf
-from cvr_analysis.modalities_study.workflows.save_data import create_hash_check_override, conditionally_save_data
+from cvr_analysis.legacy.modalities_study.workflows.post_processing import post_processing_wf
+from cvr_analysis.legacy.modalities_study.workflows.regression import regression_wf
+from cvr_analysis.legacy.modalities_study.workflows.save_data import create_hash_check_override, conditionally_save_data
 
 # %%
 ##############################################

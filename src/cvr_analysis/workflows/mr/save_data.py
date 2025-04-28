@@ -140,97 +140,130 @@ def saveData(
                                                     bold_postproc_timeseries, bold_timeshift_maxcorr, bold_maxcorr, bold_timeshifts, bold_correlations,
                                                         bold_aligned_regressor_timeseries,
                                                             # bold regression data
-                                                            bold_dof, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_tsnr, 
+                                                            bold_dof, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_standard_error, bold_t_value,
                                                                 bold_cvr_amplitude, bold_p_value, regression_down_sampled_sample_time,
-                                                                    # full output
-                                                                    full_output = False) -> tuple:
+                                                                    # data to save
+                                                                    data_to_save = "cvr+tshift+pvalue") -> tuple:
         
-        # make output folder if not exist
-        path_folder = Path(os.path.split(analysis_file)[0])
-        path_folder.mkdir(parents=True, exist_ok=True)
-        # get preable
-        preamble = analysis_file.split("desc-")[0]
-        # 4D data
-        if full_output:
-            timeseries_masker.inverse_transform(bold_postproc_timeseries.T).to_filename(preamble + "desc-postproc_bold.nii.gz")
-            timeseries_masker.inverse_transform(bold_correlations.T).to_filename(preamble + "desc-correlations_map.nii.gz")
-            timeseries_masker.inverse_transform(bold_aligned_regressor_timeseries.T).to_filename(preamble + "desc-alignedRegressor_map.nii.gz")
-            timeseries_masker.inverse_transform(bold_predictions.T).to_filename(preamble + "desc-predictions_bold.nii.gz")
-        # 3D data
-        timeseries_masker.inverse_transform(bold_cvr_amplitude).to_filename(preamble + "desc-cvrAmplitude_map.nii.gz")
-        timeseries_masker.inverse_transform(bold_p_value).to_filename(preamble + "desc-pValue_map.nii.gz")
-        timeseries_masker.inverse_transform(bold_timeshift_maxcorr).to_filename(preamble + "desc-cvrTimeshift_map.nii.gz")
-        timeseries_masker.inverse_transform(bold_tsnr).to_filename(preamble + "desc-tsnr_map.nii.gz")
-        timeseries_masker.inverse_transform(bold_r_squared).to_filename(preamble + "desc-rSquared_map.nii.gz")
-        timeseries_masker.inverse_transform(bold_maxcorr).to_filename(preamble + "desc-maxCorr_map.nii.gz")
-        if full_output:
-            timeseries_masker.inverse_transform(bold_dof.astype(np.int32)).to_filename(preamble + "desc-dof_map.nii.gz")
-            timeseries_masker.inverse_transform(bold_adjusted_r_squared).to_filename(preamble + "desc-rSquaredAdjusted_map.nii.gz")            
-        # 1D data
-        if full_output:
-            def saveTimeseriesInfo(name, start_time, time_step):
-                dict_ = {"start-time" : start_time, "time-step" : time_step}
-                with open(name, "w") as file:
-                    json.dump(dict_, file, indent='\t')
-            # regressor co2
-            saveTimeseriesInfo(preamble + "desc-regressorAlignedCO2Series_timeseries.json", 0, regression_down_sampled_sample_time)
-            pd.DataFrame(np.vstack((regressor_postproc_timeseries, regressor_aligned_co2_timeseries)).T, columns=["regressor_series", "aligned_co2_series"]).to_csv(preamble + "desc-regressorAlignedCO2Series_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
-            # regressor autocorrelation
-            saveTimeseriesInfo(preamble + "desc-regressorAutocorrelations_timeseries.json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
-            pd.Series(regressor_autocorrelation_correlations).to_csv(preamble + "desc-regressorAutocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
-            # regressor co2 correlations
-            if regressor_co2_correlations is not None:
-                saveTimeseriesInfo(preamble + "desc-regressorCO2Correlations_timeseries.json", regressor_co2_timeshifts[0], up_sampled_sample_time)
-                pd.Series(regressor_co2_correlations).to_csv(preamble + "desc-regressorCO2Correlations_timeseries.tsv.gz", sep="\t", index = False, header=False, compression="gzip")
-            # co2 autocorrelation
-            if co2_autocorrelation_correlations is not None:
-                saveTimeseriesInfo(preamble + "desc-co2Autocorrelations_timeseries.json", co2_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(co2_autocorrelation_correlations).to_csv(preamble + "desc-co2Autocorrelations_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
-        # pd.Series(bold_timeshifts, name="timeshifts").to_csv(preamble + "desc-boldTimeshifts_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
-        if full_output:
-            pass
-        # timeseries masker
-        if isinstance(timeseries_masker, maskers.NiftiMasker):
-            timeseries_mask_file = timeseries_masker.mask_img_.get_filename()
-        elif isinstance(timeseries_masker, maskers.NiftiLabelsMasker):
-            timeseries_mask_file = timeseries_masker.labels_img_.get_filename()
-        else:
-            raise ValueError(f"Unrecognized timeseries masker: {type(timeseries_masker).__name__}")
-        # 1D data
-        data_info = {
-                    # pre-processing data
-                    "subject"                           : subject,
-                    "session"                           : session,
-                    "task"                              : task,
-                    "run"                               : run, 
-                    "space"                             : space,
-                    "bold-tr"                           : bold_tr,
-                    # post-processing data
-                    "up-sampling-factor"                : up_sampling_factor,
-                    "up-sampled-sample-time"            : up_sampled_sample_time,
-                    "voxel-mask-file"                   : voxel_mask_img.get_filename(),
-                    "timeseries-masker-file"            : timeseries_mask_file,
-                    "co2-event-name"                    : co2_event_name,
-                    # regressor co2 data
-                    "regressor-co2-timeshift-maxcorr"   : regressor_co2_timeshift_maxcorr,
-                    "regressor-co2-maxcorr"             : regressor_co2_maxcorr,
-                    "regressor-co2-beta"                : regressor_co2_beta,
-                    "regressor-rms"                     : regressor_rms,
-                    "co2-rms"                           : co2_rms,
-                    # bold alignment data
-                    "reference-regressor-timeshift"     : reference_regressor_timeshift, 
-                    "align-regressor-absolute-bounds"   : (align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound),
-                    "align-regressor-time-step"         : up_sampled_sample_time,
-                    "align-regressor-start-time"        : bold_timeshifts[0,0],
-                }
-        with open(preamble + "desc-data_info.json", "w") as info_file:
-            json.dump(data_info, info_file, indent='\t')
-        
-        # save analysis dict last since this indicate analysis has been completed succesfully
-        with open(analysis_file, "w") as info_file:
-            json.dump(analysis_dict, info_file, indent='\t')
+        # timeseries info
+        def saveTimeseriesInfo(name, start_time, time_step):
+            dict_ = {"start-time" : start_time, "time-step" : time_step}
+            with open(name, "w") as file:
+                json.dump(dict_, file, indent='\t')
+        # data to save
+        if data_to_save is not None:
+            # make output folder if not exist
+            path_folder = Path(os.path.split(analysis_file)[0])
+            path_folder.mkdir(parents=True, exist_ok=True)
+            # get preamble
+            preamble = analysis_file.split("desc-")[0]
+            # get data to save list
+            if isinstance(data_to_save, str):
+                # create data list
+                data_save_list = data_to_save.lower().split("+")
+            elif isinstance(data_to_save, (list,tuple)):
+                data_save_list = []
+                for d in data_to_save:
+                    assert isinstance(d, str)
+                    data_save_list.apppend(d.lower())
+            else:
+                raise ValueError("'data_to_save' needs to be string or list.")
+            # check if all data specified in available
+            available_data = {"postproc", "xcorrelation", "alignedregressor", "prediction", 
+                              "cvr", "tshift", "pvalue", "tvalue", "se", "rsquared", "adjustedrsquared", "maxcorr", "dof", 
+                                "regressoralignedco2series", "regressorco2xcorrelation", "regressorautocorrelation", "co2autocorrelation"}
+            non_available_data = set(data_save_list) - available_data 
+            if non_available_data:
+                raise ValueError(f"Following data is not available: {non_available_data}")
+            # save data
+            # 4D data
+            if "postproc" in data_save_list:
+                timeseries_masker.inverse_transform(bold_postproc_timeseries.T).to_filename(preamble + "desc-postproc_bold.nii.gz")
+            if "xcorrelation" in data_save_list:
+                saveTimeseriesInfo(preamble + "desc-xCorrelation_timeseries.json", bold_timeshifts[0,0], up_sampled_sample_time)
+                timeseries_masker.inverse_transform(bold_correlations.T).to_filename(preamble + "desc-xCorrelation_timeseries.nii.gz")
+            if "alignedregressor" in data_save_list:
+                timeseries_masker.inverse_transform(bold_aligned_regressor_timeseries.T).to_filename(preamble + "desc-alignedRegressor_timeseries.nii.gz")
+            if "prediction" in data_save_list:
+                timeseries_masker.inverse_transform(bold_predictions.T).to_filename(preamble + "desc-prediction_bold.nii.gz")
+            # 3D data
+            if "cvr" in data_save_list:
+                timeseries_masker.inverse_transform(bold_cvr_amplitude).to_filename(preamble + "desc-cvr_map.nii.gz")
+            if "tshift" in data_save_list:
+                timeseries_masker.inverse_transform(bold_timeshift_maxcorr).to_filename(preamble + "desc-tshift_map.nii.gz")
+            if "pvalue" in data_save_list:
+                timeseries_masker.inverse_transform(bold_p_value).to_filename(preamble + "desc-pValue_map.nii.gz")
+            if "tvalue" in data_save_list:
+                timeseries_masker.inverse_transform(bold_t_value).to_filename(preamble + "desc-tValue_map.nii.gz")
+            if "se" in data_save_list:
+                timeseries_masker.inverse_transform(bold_standard_error).to_filename(preamble + "desc-se_map.nii.gz")
+            if "rsquared" in data_save_list:
+                timeseries_masker.inverse_transform(bold_r_squared).to_filename(preamble + "desc-rSquared_map.nii.gz")
+            if "adjustedrsquared" in data_save_list:
+                timeseries_masker.inverse_transform(bold_adjusted_r_squared).to_filename(preamble + "desc-adjustedRSquared_map.nii.gz")            
+            if "maxcorr" in data_save_list:
+                timeseries_masker.inverse_transform(bold_maxcorr).to_filename(preamble + "desc-maxCorr_map.nii.gz")
+            if "dof" in data_save_list:
+                timeseries_masker.inverse_transform(bold_dof.astype(np.int32)).to_filename(preamble + "desc-dof_map.nii.gz")
+            # 1D data
+            if "regressoralignedco2series" in data_save_list:
+                # regressor co2
+                saveTimeseriesInfo(preamble + "desc-regressorAlignedCO2Series_timeseries.json", 0, regression_down_sampled_sample_time)
+                pd.DataFrame(np.vstack((regressor_postproc_timeseries, regressor_aligned_co2_timeseries)).T, columns=["regressor_series", "aligned_co2_series"]).to_csv(preamble + "desc-regressorAlignedCO2Series_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
+            if "regressorco2xcorrelation" in data_save_list: 
+                # regressor co2 correlations
+                if regressor_co2_correlations is not None:
+                    saveTimeseriesInfo(preamble + "desc-regressorCO2XCorrelation_timeseries.json", regressor_co2_timeshifts[0], up_sampled_sample_time)
+                    pd.Series(regressor_co2_correlations).to_csv(preamble + "desc-regressorCO2XCorrelation_timeseries.tsv.gz", sep="\t", index = False, header=False, compression="gzip")
+            if "regressorautocorrelation" in data_save_list: 
+                # regressor autocorrelation
+                saveTimeseriesInfo(preamble + "desc-regressorAutocorrelation_timeseries.json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
+                pd.Series(regressor_autocorrelation_correlations).to_csv(preamble + "desc-regressorAutocorrelation_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+            if "co2autocorrelation" in data_save_list:
+                # co2 autocorrelation
+                if co2_autocorrelation_correlations is not None:
+                    saveTimeseriesInfo(preamble + "desc-co2Autocorrelation_timeseries.json", co2_autocorrelation_timeshifts[0], up_sampled_sample_time)
+                    pd.Series(co2_autocorrelation_correlations).to_csv(preamble + "desc-co2Autocorrelation_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+            # timeseries masker
+            if isinstance(timeseries_masker, maskers.NiftiMasker):
+                timeseries_mask_file = timeseries_masker.mask_img_.get_filename()
+            elif isinstance(timeseries_masker, maskers.NiftiLabelsMasker):
+                timeseries_mask_file = timeseries_masker.labels_img_.get_filename()
+            else:
+                raise ValueError(f"Unrecognized timeseries masker: {type(timeseries_masker).__name__}")
+            # 1D data
+            data_info = {
+                        # pre-processing data
+                        "subject"                           : subject,
+                        "session"                           : session,
+                        "task"                              : task,
+                        "run"                               : run, 
+                        "space"                             : space,
+                        "bold-tr"                           : bold_tr,
+                        # post-processing data
+                        "up-sampling-factor"                : up_sampling_factor,
+                        "up-sampled-sample-time"            : up_sampled_sample_time,
+                        "voxel-mask-file"                   : voxel_mask_img.get_filename(),
+                        "timeseries-masker-file"            : timeseries_mask_file,
+                        "co2-event-name"                    : co2_event_name,
+                        # regressor co2 data
+                        "regressor-co2-timeshift-maxcorr"   : regressor_co2_timeshift_maxcorr,
+                        "regressor-co2-maxcorr"             : regressor_co2_maxcorr,
+                        "regressor-co2-beta"                : regressor_co2_beta,
+                        "regressor-rms"                     : regressor_rms,
+                        "co2-rms"                           : co2_rms,
+                        # bold alignment data
+                        "reference-regressor-timeshift"     : reference_regressor_timeshift, 
+                        "align-regressor-absolute-bounds"   : (align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound),
+                    }
+            with open(preamble + "desc-data_info.json", "w") as info_file:
+                json.dump(data_info, info_file, indent='\t')
+            
+            # save analysis dict last since this indicate analysis has been completed succesfully
+            with open(analysis_file, "w") as info_file:
+                json.dump(analysis_dict, info_file, indent='\t')
 
 save_data_node = CustomNode(saveData, description="save data")
 
-conditionally_save_data = ConditionalNode(conditional_input = "save_data", default_condition = True, condition_node_map = {True : save_data_node, False : None}, description = "Save data conditionally")
+# conditionally_save_data = ConditionalNode(conditional_input = "save_data", default_condition = True, condition_node_map = {True : save_data_node, False : None}, description = "Save data conditionally")
 

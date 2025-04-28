@@ -186,7 +186,7 @@ iterate_cvr_align_downsample = IteratingNode(align_downsample_wf.copy(), iterati
 ##############################################
 # iterate calculate cvr over doppler timeseries
 ##############################################
-iterate_cvr_regress = IteratingNode(RegressCVR(), iterating_inputs=("bold_ts", "regressor_timeseries"), iterating_name="doppler", exclude_outputs=("design_matrix", "betas"), description="iterate cvr – regress").setDefaultInputs(dopplerIter_nr_parallel_processes = -1)
+iterate_cvr_regress = IteratingNode(RegressCVR(), iterating_inputs=("dv_ts", "regressor_timeseries"), iterating_name="doppler", exclude_outputs=("design_matrix", "betas"), description="iterate cvr – regress").setDefaultInputs(dopplerIter_nr_parallel_processes = -1)
 
 ##############################################
 # compute absolute bounds
@@ -235,7 +235,7 @@ iterate_cvr_wf = ProcessWorkflow(
         (ProcessWorkflow.input.show_pbar, iterate_cvr_regress.input.dopplerIter_show_pbar),
         (ValueNode(None).output.value, iterate_cvr_regress.input.confounds_df),
         (ValueNode(None).output.value, iterate_cvr_regress.input.confound_regressor_correlation_threshold),
-        (iterate_cvr_align_downsample.output.dopplerIter_down_sampled_ref_timeseries, iterate_cvr_regress.input.dopplerIter_bold_ts),
+        (iterate_cvr_align_downsample.output.dopplerIter_down_sampled_ref_timeseries, iterate_cvr_regress.input.dopplerIter_dv_ts),
         (iterate_cvr_align_downsample.output.dopplerIter_down_sampled_aligned_timeseries, iterate_cvr_regress.input.dopplerIter_regressor_timeseries),
         (iterate_cvr_regress.output.all - iterate_cvr_regress.output.dopplerIter_predictions, ProcessWorkflow.output._),
         (iterate_cvr_regress.output.dopplerIter_predictions, ProcessWorkflow.output.dopplerIter_down_sampled_doppler_signal_predictions)

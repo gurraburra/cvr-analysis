@@ -1,6 +1,6 @@
-from cvr_analysis.modalities_study.workflows.cvr_wf import cvr_wf
-from cvr_analysis.modalities_study.workflows.post_processing import data_loader_wf, signal_processing_wf
-from cvr_analysis.modalities_study.workflows.regression import setup_regression_wf, iterate_cvr_wf
+from cvr_analysis.legacy.modalities_study.workflows.cvr_wf import cvr_wf
+from cvr_analysis.legacy.modalities_study.workflows.post_processing import data_loader_wf, signal_processing_wf
+from cvr_analysis.legacy.modalities_study.workflows.regression import setup_regression_wf, iterate_cvr_wf
 
 data_loader_wf.cacheNodesData(True)
 signal_processing_wf.cacheNodesData(True)
