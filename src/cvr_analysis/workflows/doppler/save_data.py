@@ -102,7 +102,7 @@ def saveData(
                                                 doppler_postproc_timeseries, doppler_timeshift_maxcorr, doppler_maxcorr, doppler_timeshifts, doppler_correlations,
                                                     doppler_aligned_regressor_timeseries, 
                                                         # doppler regression data
-                                                        doppler_dof, doppler_predictions, doppler_r_squared, doppler_adjusted_r_squared, doppler_tsnr, 
+                                                        doppler_dof, doppler_predictions, doppler_r_squared, doppler_adjusted_r_squared, doppler_se, 
                                                             doppler_cvr_amplitude, doppler_p_value, regression_down_sampled_sample_time,
                                                                 # full output
                                                                 full_output = False) -> tuple:

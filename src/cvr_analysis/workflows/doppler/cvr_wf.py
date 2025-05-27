@@ -46,11 +46,11 @@ cvr_analysis_wf = ProcessWorkflow(
         (regression_wf.output.dopplerIter_correlations, conditionally_save_data.input.doppler_correlations),
         (regression_wf.output.dopplerIter_down_sampled_aligned_regressor_signal_timeseries, conditionally_save_data.input.doppler_aligned_regressor_timeseries),
         (regression_wf.output.dopplerIter_dof, conditionally_save_data.input.doppler_dof),
-        (regression_wf.output.dopplerIter_regressor_p, conditionally_save_data.input.doppler_p_value),
         (regression_wf.output.dopplerIter_down_sampled_doppler_signal_predictions, conditionally_save_data.input.doppler_predictions),
         (regression_wf.output.dopplerIter_r_squared, conditionally_save_data.input.doppler_r_squared),
         (regression_wf.output.dopplerIter_adjusted_r_squared, conditionally_save_data.input.doppler_adjusted_r_squared),
-        (regression_wf.output.dopplerIter_tsnr, conditionally_save_data.input.doppler_tsnr),
+        (regression_wf.output.dopplerIter_regressor_p, conditionally_save_data.input.doppler_p_value),
+        (regression_wf.output.dopplerIter_regressor_se, conditionally_save_data.input.doppler_se),
         (regression_wf.output.dopplerIter_regressor_beta, conditionally_save_data.input.doppler_cvr_amplitude),
         (regression_wf.output.down_sampled_sample_time, conditionally_save_data.input.regression_down_sampled_sample_time),
         # map save data output
