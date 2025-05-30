@@ -138,7 +138,7 @@ def maxMinNorm(sig):
 
 norm_funcs = {"stand" : stand, "maxMin" : maxMinNorm, None : lambda x : x}
 
-def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_transform = None, norm : str = "maxMin", data_include = "bold+regressor+predictions", ensure_uniform_sampling = True, **custom_settings):
+def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_transform = None, norm : str = "maxMin", data_include = "bold+regressor+predictions", non_zero_mask = False, radiological = True, **custom_settings):
     # settings
     settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower", 'interpolation' : 'antialiased'}
     settings.update(custom_settings)
@@ -149,33 +149,34 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
     preamble = analys_file.split("_desc-analys_info")[0]
     # cvr file
     cvr_img = image.load_img(os.path.join(folder, preamble + f"_desc-{img_desc}_map.nii.gz"))
-    # ensure_uniform_sampling 
-    if ensure_uniform_sampling:
-        # store all corner points
-        points = []
-        for x,y,z in product(*[[0,s-1] for s in cvr_img.shape]):
-            points.append((x,y,z,1))
-        points = np.array(points).T
-        # transform using affine transform
-        affine_points = np.linalg.matmul(cvr_img.affine, points)
-        # find max and min
-        min_loc = np.min(affine_points, axis = 1)[:3] 
-        max_loc = np.max(affine_points, axis = 1)[:3]
-        # find the voxel with smallest scale
-        scale = np.abs(cvr_img.affine.diagonal()[:3]).min()
-        # create new affine matrix
-        affine = np.eye(4)
-        affine[[0,1,2], [0,1,2]] = scale
-        # set least value to min location
-        affine[:3,3] = min_loc
-        # make sure out shape cover whole field of view
-        out_shape = np.ceil((max_loc - min_loc) / scale).astype(int)
-        # create data transform matrix
-        data_transform = np.linalg.matmul(np.linalg.inv(cvr_img.affine), affine)
-        # resample cvr img
-        cvr_img = image.resample_img(cvr_img, affine, out_shape, force_resample=True)
-    else:
-        data_transform = np.eye(4)
+    # resample image to display correctly
+    # store all corner points
+    points = []
+    for x,y,z in product(*[[0,s-1] for s in cvr_img.shape]):
+        points.append((x,y,z,1))
+    points = np.array(points).T
+    # transform using affine transform
+    affine_points = np.linalg.matmul(cvr_img.affine, points)
+    # find max and min
+    min_loc = np.min(affine_points, axis = 1)[:3] 
+    max_loc = np.max(affine_points, axis = 1)[:3]
+    # find the voxel with smallest scale
+    scale = np.abs(cvr_img.affine.diagonal()[:3]).min()
+    # create new affine matrix
+    affine = np.eye(4)
+    affine[[0,1,2], [0,1,2]] = scale
+    # set least value to min location
+    affine[:3,3] = min_loc
+    # radiological
+    if radiological:
+        affine[0,3] = max_loc[0]
+        affine[0,0] = -affine[0,0]
+    # make sure out shape cover whole field of view
+    out_shape = np.ceil((max_loc - min_loc) / scale).astype(int)
+    # create data transform matrix
+    data_transform = np.linalg.matmul(np.linalg.inv(cvr_img.affine), affine)
+    # resample cvr img
+    cvr_img = image.resample_img(cvr_img, affine, out_shape, force_resample=True)
     # cvr data
     cvr_data = cvr_img.get_fdata()
     # mask
@@ -196,12 +197,12 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
         except:
             print("No timeshift img found")
     # get bold data
-    if "bold" in data_include:
+    if "postproc" in data_include:
         try:
             bold_img = image.load_img(os.path.join(folder, preamble + "_desc-postproc_bold.nii.gz"))
             data.append((norm_func(bold_img.get_fdata()), "bold"))
         except:
-            print("No bold img found")
+            print("No postproc img found")
     # get aligned regressor data
     if "regressor" in data_include:
         try:
@@ -210,9 +211,9 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
         except:
             print("No regressor img found")
     # get predictions
-    if "predictions" in data_include:
+    if "prediction" in data_include:
         try:
-            predictions_img = image.load_img(os.path.join(folder, preamble + "_desc-predictions_bold.nii.gz"))
+            predictions_img = image.load_img(os.path.join(folder, preamble + "_desc-prediction_bold.nii.gz"))
             data.append((norm_func(predictions_img.get_fdata()), "prediction"))
         except:
             print("No prediction img found")
@@ -229,9 +230,12 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
             print("No correlation img found")
     # get voxel mask
     try:
-        with open(os.path.join(folder, preamble + "_desc-data_info.json"), "r") as file:
-            data_info = json.load(file)
-        voxel_mask_img = image.resample_to_img(data_info['voxel-mask-file'], cvr_img, force_resample=True, interpolation="nearest")
+        if non_zero_mask:
+            voxel_mask_img = image.math_img("~np.isclose(img,0)", img = cvr_img)
+        else:
+            with open(os.path.join(folder, preamble + "_desc-data_info.json"), "r") as file:
+                data_info = json.load(file)
+            voxel_mask_img = image.resample_to_img(data_info['voxel-mask-file'], cvr_img, force_resample=True, interpolation="nearest")
         voxel_mask = np.ma.masked_where(voxel_mask_img.get_fdata(), voxel_mask_img.get_fdata())
         # voxel_mask = None
     except:
