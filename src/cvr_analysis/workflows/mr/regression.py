@@ -188,6 +188,7 @@ find_timeshift_wf = ProcessWorkflow(
         (ProcessWorkflow.input.correlation_peak_threshold, iterate_correlate_wf.input.peak_threshold),
         (ProcessWorkflow.input.correlation_multi_peak_strategy, iterate_correlate_wf.input.multi_peak_strategy),
         (ProcessWorkflow.input.reference_regressor_timeshift, iterate_correlate_wf.input.ref_timeshift),
+        (ValueNode(False).output.value, iterate_correlate_wf.input.boldIter_concat_array_outputs),
         (add_none_lower.output.output, iterate_correlate_wf.input.lower_limit),
         (add_none_upper.output.output, iterate_correlate_wf.input.upper_limit),
         (iterate_correlate_wf.output[("boldIter_timeshifts", "boldIter_correlations", "boldIter_fit_status")] , ProcessWorkflow.output._),
@@ -226,9 +227,10 @@ refine_regressor_pca_reduce = PCAReducedTimeSeries(description="refine regressor
 refine_regressor_wf = ProcessWorkflow(
     (
         # find timeshift
-        (ProcessWorkflow.input._, refine_regressor_find_timeshift.input.all / refine_regressor_find_timeshift.input[("maxcorr_bipolar", "filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "timeseries_masker")]),
+        (ProcessWorkflow.input._, refine_regressor_find_timeshift.input.all / refine_regressor_find_timeshift.input[("show_pbar", "maxcorr_bipolar", "filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "timeseries_masker")]),
         (ValueNode(None).output.value, refine_regressor_find_timeshift.input[("filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "timeseries_masker")]),
         (ValueNode(False).output.value, refine_regressor_find_timeshift.input.maxcorr_bipolar),
+        (ProcessWorkflow.input.show_pbar_refine, refine_regressor_find_timeshift.input.show_pbar),
         # mask timeseries
         (ProcessWorkflow.input.bold_signal_timeseries.T, refine_regressor_mask_timeseries.input.timeseries),
         (refine_regressor_find_timeshift.output.boldIter_maxcorr >= ProcessWorkflow.input.refine_regressor_correlation_threshold, refine_regressor_mask_timeseries.input.mask),
@@ -240,8 +242,9 @@ refine_regressor_wf = ProcessWorkflow(
         # align
         (ProcessWorkflow.input.sample_time, refine_regressor_align_bold.input.time_step),
         (ProcessWorkflow.input.nr_parallel_processes, refine_regressor_align_bold.input.refineIter_nr_parallel_processes),
-        (ProcessWorkflow.input.show_pbar, refine_regressor_align_bold.input.refineIter_show_pbar),
+        (ProcessWorkflow.input.show_pbar_refine, refine_regressor_align_bold.input.refineIter_show_pbar),
         (ProcessWorkflow.input.bold_signal_timeseries.shape[0], refine_regressor_align_bold.input.length),
+        (ValueNode(False).output.value, refine_regressor_align_bold.input.refineIter_concat_array_outputs),
         (refine_regressor_mask_timeseries.output.masked_timeseries, refine_regressor_align_bold.input.refineIter_timeseries),
         (masked_hist_peak.output.histogram_peak - refine_regressor_mask_timeshifts.output.masked_timeseries, refine_regressor_align_bold.input.refineIter_timeshift),
         (ValueNode(False).output.value, refine_regressor_align_bold.input.fill_nan),
@@ -440,6 +443,7 @@ setup_regression_wf = ProcessWorkflow(
         (signal_timeseries_wf.output.bold_signal_timeseries, recursively_refine_regressor.input.bold_signal_timeseries),
         (choose_regressor.output.signal_timeseries, recursively_refine_regressor.input.Init_refined_regressor_signal_timeseries),
         (ValueNode(0).output.value, recursively_refine_regressor.input.Init_refined_reference_regressor_timeshift),
+        (ValueNode(False).output.value, recursively_refine_regressor.input.show_pbar_refine),
         (recursively_refine_regressor.output.Rec_refined_reference_regressor_timeshift, ProcessWorkflow.output.setup_reference_regressor_timeshift),
         # dynamic time warping co2 to regressor
         (ProcessWorkflow.input._, conditional_dtw.input[('sample_time', 'correlation_phat', 'correlation_window', 'do_dtw')]),
@@ -532,6 +536,7 @@ iterate_cvr_wf = ProcessWorkflow(
         (ProcessWorkflow.input.sample_time, iterate_cvr_align_downsample.input.sample_time),
         (ProcessWorkflow.input.down_sampling_factor, iterate_cvr_align_downsample.input.down_sampling_factor),
         (ProcessWorkflow.input.regressor_signal_timeseries, iterate_cvr_align_downsample.input.align_timeseries),
+        (ValueNode(False).output.value, iterate_cvr_align_downsample.input.boldIter_concat_array_outputs),
         (iterate_cvr_find_timeshift.output.boldIter_timeshift_maxcorr, iterate_cvr_align_downsample.input.boldIter_timeshift),
         (iterate_cvr_align_downsample.output.all / iterate_cvr_align_downsample.output["boldIter_down_sampled_ref_timeseries", "boldIter_down_sampled_aligned_timeseries"], ProcessWorkflow.output._),
         (iterate_cvr_align_downsample.output.boldIter_down_sampled_ref_timeseries, ProcessWorkflow.output.boldIter_down_sampled_bold_signal_ts),
@@ -541,6 +546,7 @@ iterate_cvr_wf = ProcessWorkflow(
         (ProcessWorkflow.input.show_pbar, iterate_cvr_regress.input.boldIter_show_pbar),
         (ProcessWorkflow.input.down_sampled_regression_confounds_signal_df, iterate_cvr_regress.input.confounds_df),
         (ProcessWorkflow.input.confound_regressor_correlation_threshold, iterate_cvr_regress.input.confound_regressor_correlation_threshold),
+        (ValueNode(False).output.value, iterate_cvr_regress.input.boldIter_concat_array_outputs),
         (iterate_cvr_align_downsample.output.boldIter_down_sampled_ref_timeseries, iterate_cvr_regress.input.boldIter_dv_ts),
         (iterate_cvr_align_downsample.output.boldIter_down_sampled_aligned_timeseries, iterate_cvr_regress.input.boldIter_regressor_timeseries),
         (iterate_cvr_regress.output.all - iterate_cvr_regress.output.boldIter_predictions, ProcessWorkflow.output._),
