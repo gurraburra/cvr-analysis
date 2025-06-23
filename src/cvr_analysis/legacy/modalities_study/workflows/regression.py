@@ -226,7 +226,8 @@ refine_regressor_pca_reduce = PCAReducedTimeSeries(description="refine regressor
 refine_regressor_wf = ProcessWorkflow(
     (
         # find timeshift
-        (ProcessWorkflow.input._, refine_regressor_find_timeshift.input.all / refine_regressor_find_timeshift.input[("maxcorr_bipolar", "filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "timeseries_masker")]),
+        (ProcessWorkflow.input._, refine_regressor_find_timeshift.input.all / refine_regressor_find_timeshift.input[("show_pbar", "maxcorr_bipolar", "filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "timeseries_masker")]),
+        (ProcessWorkflow.input.refine_show_pbar, refine_regressor_find_timeshift.input.show_pbar),
         (ValueNode(None).output.value, refine_regressor_find_timeshift.input[("filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "timeseries_masker")]),
         (ValueNode(False).output.value, refine_regressor_find_timeshift.input.maxcorr_bipolar),
         # mask timeseries
@@ -240,7 +241,7 @@ refine_regressor_wf = ProcessWorkflow(
         # align
         (ProcessWorkflow.input.sample_time, refine_regressor_align_bold.input.time_step),
         (ProcessWorkflow.input.nr_parallel_processes, refine_regressor_align_bold.input.refineIter_nr_parallel_processes),
-        (ProcessWorkflow.input.show_pbar, refine_regressor_align_bold.input.refineIter_show_pbar),
+        (ProcessWorkflow.input.refine_show_pbar, refine_regressor_align_bold.input.refineIter_show_pbar),
         (ProcessWorkflow.input.bold_signal_timeseries.shape[0], refine_regressor_align_bold.input.length),
         (refine_regressor_mask_timeseries.output.masked_timeseries, refine_regressor_align_bold.input.refineIter_timeseries),
         (masked_hist_peak.output.histogram_peak - refine_regressor_mask_timeshifts.output.masked_timeseries, refine_regressor_align_bold.input.refineIter_timeshift),
