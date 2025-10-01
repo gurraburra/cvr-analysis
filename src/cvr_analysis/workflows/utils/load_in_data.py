@@ -21,7 +21,7 @@ def _isNiftiFile(desc):
     else:
         return desc
     
-def _getBIDSFiles(bids_directory, subject, session=None, data_type=None, task=None, acq=None, run=None, space=None, desc=None, suffix=None, extension=None):
+def _getBIDSFiles(bids_directory, subject, session=None, data_type=None, task=None, acq=None, run=None, space=None, recording=None, desc=None, suffix=None, extension=None):
     # data type
     if data_type is None:
         data_folder = "*"
@@ -47,6 +47,9 @@ def _getBIDSFiles(bids_directory, subject, session=None, data_type=None, task=No
         file_spec += f"_space-{space}"
     # add wild card
     file_spec += "*"
+    # recording
+    if recording is not None:
+        file_spec += f"_recording-{recording}"
     # desc
     if desc is not None:
         file_spec += f"_desc-{desc}"
@@ -66,9 +69,9 @@ def _getBIDSFiles(bids_directory, subject, session=None, data_type=None, task=No
     
 
 class LoadBOLDData(ProcessNode):
-    outputs = ("bold_img", "confounds_df", "events_df", "tr", "nr_measurements")
+    outputs = ("bold_img", "confounds_df", "tr", "nr_measurements")
     
-    def _run(self, bids_directory : str, subject : str = None, session : str = None, task : str = None, run : str = None, space : str = None, load_confounds : bool = False, load_events : bool = True) -> dict:
+    def _run(self, bids_directory : str, subject : str = None, session : str = None, task : str = None, run : str = None, space : str = None, load_confounds : bool = False) -> dict:
         # load bild data
         bold_img = image.load_img(
                         _checkBIDSQuery("BOLD", 
@@ -85,7 +88,7 @@ class LoadBOLDData(ProcessNode):
         # nr_meas
         nr_meas = bold_img.shape[3]
 
-        bold_json_file = _checkBIDSQuery("BOLD JSON", 
+        bold_physio_json = _checkBIDSQuery("BOLD JSON", 
                             _getBIDSFiles(
                                         bids_directory,
                                             subject=subject, 
@@ -99,7 +102,7 @@ class LoadBOLDData(ProcessNode):
     
         # tr
         # tr = bids_directory.get_metadata(bold_img.get_filename())["RepetitionTime"]
-        with open(bold_json_file, "r") as file:
+        with open(bold_physio_json, "r") as file:
             tr = json.load(file)["RepetitionTime"]
         
         # load in confounds 
@@ -118,36 +121,11 @@ class LoadBOLDData(ProcessNode):
         else:
             confounds_df = None
         
-        # load in events
-        if load_events:
-            for acq in ["bold", None]:
-                # try events using acq
-                try:
-                    events_df = pd.read_csv(
-                                        _checkBIDSQuery("events", 
-                                            _getBIDSFiles(
-                                                bids_directory, 
-                                                    subject=subject, 
-                                                        session=session, 
-                                                            data_type="func",
-                                                                task=task, 
-                                                                    acq=acq,
-                                                                        run=run, 
-                                                                            suffix="events", 
-                                                                                extension=".tsv")), sep='\t')
-                except ValueError:
-                    continue
-                break
-            else:
-                raise ValueError("Could not load events file.")
-
-
-        else:
-            events_df = None
+        
 
         
         
-        return bold_img, confounds_df, events_df, tr, nr_meas
+        return bold_img, confounds_df, tr, nr_meas
 
 
 class LoadBidsImg(ProcessNode):
@@ -181,7 +159,7 @@ class CropBOLDImg(ProcessNode):
 
     def _run(self, bold_img, voxel_mask_img):
         # make sure they are aligned
-        resampled_voxel_mask_img = image.resample_to_img(voxel_mask_img, bold_img, interpolation='nearest')
+        resampled_voxel_mask_img = image.resample_to_img(voxel_mask_img, bold_img, interpolation='nearest', force_resample=True, copy_header=True)
         return image.math_img('img * np.array(voxel_mask, dtype=bool)[...,None]', img = bold_img, voxel_mask = resampled_voxel_mask_img), resampled_voxel_mask_img
 
 class VoxelTimeSeriesMasker(ProcessNode):
@@ -194,18 +172,47 @@ class RoiTimeSeriesMasker(ProcessNode):
     outputs = ("roi_masker",)
     
     def _run(self, labels_img, voxel_mask_img, spatial_smoothing_fwhm = None) -> tuple:
-        return maskers.NiftiLabelsMasker(labels_img=labels_img, mask_img=voxel_mask_img, smoothing_fwhm=spatial_smoothing_fwhm)
+        return maskers.NiftiLabelsMasker(labels_img=labels_img, mask_img=voxel_mask_img, smoothing_fwhm=spatial_smoothing_fwhm, keep_masked_labels = False)
 
-class GetTimeSeriesEvent(ProcessNode):
-    outputs = ("times", "timeseries", "event_name")
+class LoadTimeseriesEvent(ProcessNode):
+    # keept for backwards compatibility with old events file
+    outputs = ("times", "timeseries", "event_name", "unit")
     
-    def _run(self, events_df : pd.DataFrame, event_name) -> tuple:
+    def _run(self, bids_directory : str, subject : str = None, session : str = None, data_type : str = None, task : str = None, run : str = None, event_name : list = None) -> tuple:
+        # load in events
+        for acq in ["*", None]:
+            # try events using acq
+            try:
+                events_df = pd.read_csv(
+                                    _checkBIDSQuery("events", 
+                                        _getBIDSFiles(
+                                            bids_directory, 
+                                                subject=subject, 
+                                                    session=session, 
+                                                        data_type=data_type,
+                                                            task=task, 
+                                                                acq=acq,
+                                                                    run=run, 
+                                                                        suffix="events", 
+                                                                            extension=".tsv")), sep='\t')
+            except ValueError:
+                continue
+            break
+        else:
+            raise ValueError("Could not load events file.")
+        
         # inner search function
         def search(name_):
             for event_type in set(events_df["trial_type"]):
                 if re.search(name_, event_type):
                     times, ts = events_df.query(f"trial_type == '{event_type}'").loc[:,["onset", "value"]].to_numpy().T
-                    return times, ts, event_type
+                    # try to get unit
+                    u = re.search(r".*\[(.*)\]$", event_type)
+                    if u:
+                        unit = u.group(1)
+                    else:
+                        unit = ""
+                    return times, ts, event_type, unit
                 
         # check if list or tuple given
         if isinstance(event_name, (list, tuple)):
@@ -300,3 +307,68 @@ class LoadDopplerData(ProcessNode):
         
         
         return doppler_time_ts, mean_tr, unit_time, doppler_bf_ts, headers_bf, units_bf, events_df 
+    
+
+class LoadPhysioData(ProcessNode):
+    outputs = ("times", "timeseries", "time_step", "units")
+    def _run(self, bids_directory : str, subject : str = None, session : str = None, data_type : str = None, task : str = None, acq : str = None, run : str = None, recording : str = None, variables : list = None) -> dict:
+        # load json
+        physio_json_name =  _checkBIDSQuery("Physio", 
+                            _getBIDSFiles(
+                                        bids_directory,
+                                            subject=subject, 
+                                                session=session, 
+                                                    data_type=data_type,
+                                                        task=task, 
+                                                            acq=acq,
+                                                                run=run, 
+                                                                    recording=recording,
+                                                                        suffix="physio", 
+                                                                            extension=".json"))
+        with open(physio_json_name, "r") as j_file:
+            physio_json = json.load(j_file)
+        # check file
+        assert "SamplingFrequency" in physio_json; samp_freq = physio_json["SamplingFrequency"]
+        assert "StartTime" in physio_json; start_time = physio_json["StartTime"]
+        assert "Columns" in physio_json; columns = physio_json["Columns"]
+
+        # load in physio ts
+        physio_ts = np.loadtxt(
+                        _checkBIDSQuery("Physio", 
+                            _getBIDSFiles(
+                                        bids_directory,
+                                            subject=subject, 
+                                                session=session, 
+                                                    data_type=data_type,
+                                                        task=task, 
+                                                            acq=acq,
+                                                                run=run, 
+                                                                    recording=recording,
+                                                                        suffix="physio", 
+                                                                            extension=".tsv*")), 
+                                                                                dtype=float, delimiter='\t')
+        
+        # check variables
+        if not isinstance(variables, (list,tuple)):
+            variables = (variables,)
+            single_var = True
+        else:
+            single_var = False
+        # mask data
+        mask = np.zeros(len(columns), dtype=bool)
+        units = []
+        for var in variables:
+            try:
+                mask[columns.index(var)] = True
+                units.append(physio_json[var]["Units"])
+            except ValueError as exc:
+                raise ValueError(f"missing variable '{var}' in physio file '{recording}'") from exc
+            
+        # times
+        t = np.arange(0,physio_ts.shape[0]) * 1 / samp_freq + start_time
+
+        # single var?
+        if single_var:
+            return t, physio_ts[:,mask][:,0], 1 / samp_freq, units[0]
+        else:
+            return t, physio_ts[:,mask], 1 / samp_freq, units

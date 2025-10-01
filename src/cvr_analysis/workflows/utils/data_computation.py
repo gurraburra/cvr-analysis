@@ -462,19 +462,18 @@ class RegressCVR(ProcessNode):
         # threshold confunds
         if confound_regressor_correlation_threshold is not None and not confounds_df.empty and not regressor_timeseries.empty:
             # filter out protected non_protected_confounds
-            protected_confound_names = []
+            protected_confound_names = ["constant"]
             protected_confound_names.extend(list(filter(lambda x : x.startswith("spike"), confounds_df.columns)))
+            protected_confound_names.extend(list(filter(lambda x : x.startswith("drift"), confounds_df.columns)))
             non_protected_confound_names = confounds_df.columns[~confounds_df.columns.isin(protected_confound_names)]
-            # get standardized non_protected_confounds
-            non_protected_confounds = non_nan_dm[non_protected_confound_names].to_numpy()
-            non_protected_confounds = (non_protected_confounds - non_protected_confounds.mean(axis = 0)) / non_protected_confounds.std(axis = 0)
-            # get standardized regressor
-            regressor = non_nan_dm["regressor"].to_numpy()
-            regressor = (regressor - regressor.mean(axis = 0)) / regressor.std(axis = 0)
-            # calculate correlation between regressor and non_protected_confounds
-            non_protected_confound_corr = non_protected_confounds.T @ regressor / len(regressor) 
-            # threshold
-            non_protected_confounds_above_thr = non_protected_confound_names[np.abs(non_protected_confound_corr) > confound_regressor_correlation_threshold]
+            # threshold confunds
+            if non_protected_confound_names.empty:
+                non_protected_confounds_above_thr = []
+            else:
+                # correlate
+                non_protected_confound_corr = np.corrcoef(non_nan_dm["regressor"], non_nan_dm[non_protected_confound_names], rowvar=False)[0, 1:]
+                # threshold
+                non_protected_confounds_above_thr = non_protected_confound_names[np.abs(non_protected_confound_corr) > confound_regressor_correlation_threshold]
             # drop
             design_matrix = design_matrix.drop(columns = non_protected_confounds_above_thr)
             non_nan_dm = non_nan_dm.drop(columns = non_protected_confounds_above_thr)

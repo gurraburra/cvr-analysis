@@ -176,7 +176,7 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
     # create data transform matrix
     data_transform = np.linalg.matmul(np.linalg.inv(cvr_img.affine), affine)
     # resample cvr img
-    cvr_img = image.resample_img(cvr_img, affine, out_shape, force_resample=True)
+    cvr_img = image.resample_img(cvr_img, affine, out_shape, force_resample=True, copy_header=True)
     # cvr data
     cvr_data = cvr_img.get_fdata()
     # mask
@@ -235,7 +235,7 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
         else:
             with open(os.path.join(folder, preamble + "_desc-data_info.json"), "r") as file:
                 data_info = json.load(file)
-            voxel_mask_img = image.resample_to_img(data_info['voxel-mask-file'], cvr_img, force_resample=True, interpolation="nearest")
+            voxel_mask_img = image.resample_to_img(data_info['voxel-mask-file'], cvr_img, force_resample=True, interpolation="nearest", copy_header=True)
         voxel_mask = np.ma.masked_where(voxel_mask_img.get_fdata(), voxel_mask_img.get_fdata())
         # voxel_mask = None
     except:
