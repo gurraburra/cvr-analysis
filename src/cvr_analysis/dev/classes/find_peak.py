@@ -6,7 +6,7 @@ from scipy.ndimage import vectorized_filter
 from nilearn.maskers import NiftiMasker
 import nibabel as nib
 import warnings
-from cvr_analysis.workflows.utils.dev.helper_functions import removeNan
+from cvr_analysis.default.helpers.helper_classes.helper_functions import removeNan
 
 # %%
 class FindPeaks(ProcessNode):
@@ -66,7 +66,8 @@ class FilterPeaks(ProcessNode):
                 if np.all(nanvalues):
                     raise RuntimeError("No peaks available")
                 med = np.nanmedian(p_max)
-                return np.where(nanvalues, med, p_max).astype(int),
+                return np.where(nanvalues
+                                , med, p_max).astype(int),
             else:
                 raise ValueError("'peaks_array' must have 1 or 2 #dimensions.")
         else: # filter -> check peaks_array is two dimensional

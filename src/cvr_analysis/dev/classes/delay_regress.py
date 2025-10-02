@@ -3,9 +3,12 @@ import numpy as np
 from process_control import ProcessWorkflow, ValueNode, CustomNode, ConditionalNode, IteratingNode
 from nilearn.maskers import NiftiMasker
 import nibabel as nib
-from cvr_analysis.workflows.utils.dev.regress import RegressNilearn
-from cvr_analysis.workflows.utils.dev.xcorr import XCorr
-from cvr_analysis.workflows.utils.dev.find_peak import FindPeaks, FilterPeaks
+from cvr_analysis.default.dev.c
+lasses.regress import RegressNilearn
+from cvr_analysis.default.dev.c
+lasses.xcorr import XCorr
+from cvr_analysis.default.dev.c
+lasses.find_peak import FindPeaks, FilterPeaks
 
 # %% No delay map
 zero_delay = CustomNode(lambda dv_ts : (np.full(dv_ts.shape[1], 0.0), ), ("delay", ))

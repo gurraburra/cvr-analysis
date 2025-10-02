@@ -162,12 +162,12 @@ def saveData(
                 subject, session, task, run, space,
                     # post-processing data
                     voxel_mask_img, timeseries_masker, bold_tr,
-                        up_sampling_factor, up_sampled_sample_time, regressor_unit, 
+                        up_sampling_factor, up_sampled_sample_time, regressor_units, 
                             # initial global alignement
                             initial_global_regressor_alignment, initial_global_aligned_regressor_timeseries, global_postproc_timeseries,
                                 # global regressor signal fit
                                 global_regressor_beta, global_regressor_timeshift_maxcorr, global_regressor_maxcorr, global_regressor_timeshifts, global_regressor_correlations, 
-                                    global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_prediction,
+                                    global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions,
                                         # global regressor data
                                         regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
                                             global_rms, global_autocorrelation_timeshifts, global_autocorrelation_correlations, 
@@ -177,7 +177,7 @@ def saveData(
                                                         bold_aligned_regressor_timeseries,
                                                             # bold regression data
                                                             bold_dof, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_standard_error, bold_t_value,
-                                                                bold_cvr_amplitude, bold_p_value, regression_sample_time,
+                                                                bold_cvr_amplitude, bold_p_value, regression_sample_time, bold_units,
                                                                 # confounds
                                                                 regression_confounds_df,
                                                                     # data to save
@@ -207,7 +207,7 @@ def saveData(
             else:
                 raise ValueError("'data_to_save' needs to be string or list.")
             # check if all data specified in available
-            available_data = {"postproc", "xcorrelation", "alignedregressor", "predictions", 
+            available_data = {"postproc", "xcorrelations", "alignedregressor", "predictions", 
                               "cvr", "tshift", "pvalue", "tvalue", "se", "rsquared", "adjustedrsquared", "maxcorr", "dof", 
                                 "initialglobalalignedregressorseries", "globalregressorfit",
                                     "globalregressorxcorrelation", "globalautocorrelation", "regressorautocorrelation", 
@@ -218,14 +218,21 @@ def saveData(
             # save data
             # 4D data
             if "postproc" in data_save_list:
-                dataToImage(timeseries_masker, bold_postproc_timeseries.T).to_filename(preamble + "desc-postproc_bold.nii.gz")
+                desc = "postproc"
+                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, up_sampled_sample_time)
+                dataToImage(timeseries_masker, bold_postproc_timeseries.T).to_filename(preamble + f"desc-{desc}_bold.nii.gz")
             if "xcorrelation" in data_save_list:
-                saveTimeseriesInfo(preamble + "desc-xCorrelation_timeseries.json", bold_timeshifts[0,0], up_sampled_sample_time)
-                dataToImage(timeseries_masker, bold_correlations.T).to_filename(preamble + "desc-xCorrelation_timeseries.nii.gz")
+                desc = "xCorrelations"
+                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", bold_timeshifts[0,0], up_sampled_sample_time)
+                dataToImage(timeseries_masker, bold_correlations.T).to_filename(preamble + f"desc-{desc}_timeseries.nii.gz")
             if "alignedregressor" in data_save_list:
-                dataToImage(timeseries_masker, bold_aligned_regressor_timeseries.T).to_filename(preamble + "desc-alignedRegressor_timeseries.nii.gz")
+                desc = "alignedRegressor"
+                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, regression_sample_time)
+                dataToImage(timeseries_masker, bold_aligned_regressor_timeseries.T).to_filename(preamble + f"desc-{desc}_timeseries.nii.gz")
             if "predictions" in data_save_list:
-                dataToImage(timeseries_masker, bold_predictions.T).to_filename(preamble + "desc-predictions_bold.nii.gz")
+                desc = "predictions"
+                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, regression_sample_time)
+                dataToImage(timeseries_masker, bold_predictions.T).to_filename(preamble + f"desc-{desc}_bold.nii.gz")
             # 3D data
             if "cvr" in data_save_list:
                 dataToImage(timeseries_masker, bold_cvr_amplitude).to_filename(preamble + "desc-cvr_map.nii.gz")
@@ -259,7 +266,7 @@ def saveData(
                 # global regressor
                 desc = "globalRegressorFit"
                 saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, regression_sample_time)
-                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_prediction)).T, columns=["global_series", "aligned_regressor_series", "prediction"]).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
+                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "prediction"]).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
             if "globalregressorxcorrelation" in data_save_list: 
                 # global regressor correlations
                 desc = "globalRegressorrXCorrelation"
@@ -301,8 +308,9 @@ def saveData(
                         "regression-sample-time"                : regression_sample_time,
                         "voxel-mask-file"                       : voxel_mask_img.get_filename(),
                         "timeseries-masker-file"                : timeseries_mask_file,
-                        "regressor-unit"                        : regressor_unit,
                         # global regressor data
+                        "regressor-units"                       : regressor_units,
+                        "bold-units"                            : bold_units,
                         "initial-global-regressor-alignment"    : initial_global_regressor_alignment,
                         "global-regressor-timeshift-maxcorr"    : global_regressor_timeshift_maxcorr,
                         "global-regressor-maxcorr"              : global_regressor_maxcorr,

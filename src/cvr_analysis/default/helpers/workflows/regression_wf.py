@@ -1,12 +1,11 @@
 # %%
-import numpy as np
-
 # process control
 from process_control import *
-from cvr_analysis.workflows.utils.signal_processing import DownsampleTimeSeries, MaskTimeSeries, DTW
-from cvr_analysis.workflows.utils.data_computation import Correlate, AlignTimeSeries, RegressCVR, PercentageChangeTimeSeries, StandardizeTimeSeries, BaselineTimeSeries, RMSTimeSeries, FilterTimeshifts, PCAReducedTimeSeries, HistPeak
-from cvr_analysis.workflows.utils.dev.confounds import MotionConfounds, SpikeConfounds, DriftConfounds
+from cvr_analysis.default.helpers.classes.signal_processing import DownsampleTimeSeries, MaskTimeSeries, DTW
+from cvr_analysis.default.helpers.classes.data_computation import Correlate, AlignTimeSeries, RegressCVR, PercentageChangeTimeSeries, StandardizeTimeSeries, BaselineTimeSeries, RMSTimeSeries, FilterTimeshifts, PCAReducedTimeSeries, HistPeak
+from cvr_analysis.default.helpers.classes.confounds import MotionConfounds, SpikeConfounds, DriftConfounds
 
+__all__ = ["regression_wf"]
 # %%
 
 ##########################################################################################################################################
@@ -23,10 +22,10 @@ from cvr_analysis.workflows.utils.dev.confounds import MotionConfounds, SpikeCon
 
 # get baseline
 # get timeseries signal values
-bold_baseline = BaselineTimeSeries(description="baseline bold timeseries")
+depvars_baseline = BaselineTimeSeries(description="baseline depvars timeseries")
 global_baseline = BaselineTimeSeries(description="baseline global timeseries")
 # get timeseries signal values
-bold_percentage = PercentageChangeTimeSeries(description="percentage bold timeseries")
+depvars_percentage = PercentageChangeTimeSeries(description="percentage depvars timeseries")
 global_percentage = PercentageChangeTimeSeries(description="percentage global timeseries")
 confounds_std = StandardizeTimeSeries(description="standardize confounds")
 
@@ -37,7 +36,7 @@ demean_signal_wf = ProcessWorkflow(
         (ProcessWorkflow.input.regressor_timeseries, regressor_baseline.input.timeseries),
         (ProcessWorkflow.input.baseline_strategy, regressor_baseline.input.baseline_strategy),
         (ProcessWorkflow.input.sample_time, regressor_baseline.input.time_step),
-        (ProcessWorkflow.input.regressor_unit, ProcessWorkflow.output.regressor_signal_unit),
+        (ProcessWorkflow.input.regressor_units, ProcessWorkflow.output.regressor_signal_units),
         (ProcessWorkflow.input.regressor_timeseries - regressor_baseline.output.baseline, ProcessWorkflow.output.regressor_signal_timeseries),
     ),
     description="create regressor signal"
@@ -54,28 +53,29 @@ psc_signal_wf = ProcessWorkflow(
         (regressor_baseline.output.baseline, regressor_psc.input.baseline),
         (regressor_psc.output.percentage_timeseries, ProcessWorkflow.output.regressor_signal_timeseries),
         # unit
-        (ValueNode("%").output.value + ProcessWorkflow.input.regressor_unit, ProcessWorkflow.output.regressor_signal_unit),
+        (ValueNode("%").output.value + ProcessWorkflow.input.regressor_units, ProcessWorkflow.output.regressor_signal_units),
     ),
     description="create regressor signal"
 )
 
 
-cond_regressor_signal = ConditionalNode("regressor", 
-                                        {ConditionalNode.no_match_condition : demean_signal_wf, "global-signal" : psc_signal_wf}, 
+cond_regressor_signal = ConditionalNode("psc_regressor", 
+                                        {False : demean_signal_wf, True : psc_signal_wf}, 
                                         description="conditionally compute regressor signal")
 
 
 # %%
 signal_timeseries_wf = ProcessWorkflow(
     (
-        # bold baseline
-        (ProcessWorkflow.input.bold_timeseries, bold_baseline.input.timeseries),
-        (ProcessWorkflow.input.baseline_strategy, bold_baseline.input.baseline_strategy),
-        (ProcessWorkflow.input.sample_time, bold_baseline.input.time_step),
-        # bold percentage
-        (ProcessWorkflow.input.bold_timeseries, bold_percentage.input.timeseries),
-        (bold_baseline.output.baseline, bold_percentage.input.baseline),
-        (bold_percentage.output.percentage_timeseries, ProcessWorkflow.output.bold_signal_timeseries),
+        # depvars baseline
+        (ProcessWorkflow.input.depvars_timeseries, depvars_baseline.input.timeseries),
+        (ProcessWorkflow.input.baseline_strategy, depvars_baseline.input.baseline_strategy),
+        (ProcessWorkflow.input.sample_time, depvars_baseline.input.time_step),
+        # depvars percentage
+        (ProcessWorkflow.input.depvars_timeseries, depvars_percentage.input.timeseries),
+        (depvars_baseline.output.baseline, depvars_percentage.input.baseline),
+        (depvars_percentage.output.percentage_timeseries, ProcessWorkflow.output.depvars_signal_timeseries),
+        (ValueNode("%").output.value + ProcessWorkflow.input.depvars_units, ProcessWorkflow.output.depvars_signal_units),
         # global baseline
         (ProcessWorkflow.input.global_timeseries, global_baseline.input.timeseries),
         (ProcessWorkflow.input.baseline_strategy, global_baseline.input.baseline_strategy),
@@ -85,13 +85,13 @@ signal_timeseries_wf = ProcessWorkflow(
         (global_baseline.output.baseline, global_percentage.input.baseline),
         (global_percentage.output.percentage_timeseries, ProcessWorkflow.output.global_signal_timeseries),
         # regressor signal
-        (ProcessWorkflow.input.regressor, cond_regressor_signal.input.regressor),
+        (ProcessWorkflow.input.psc_regressor, cond_regressor_signal.input.psc_regressor),
         (ProcessWorkflow.input.regressor_timeseries, cond_regressor_signal.input.regressor_timeseries),
-        (ProcessWorkflow.input.regressor_unit, cond_regressor_signal.input.regressor_unit),
+        (ProcessWorkflow.input.regressor_units, cond_regressor_signal.input.regressor_units),
         (ProcessWorkflow.input.baseline_strategy, cond_regressor_signal.input.baseline_strategy),
         (ProcessWorkflow.input.sample_time, cond_regressor_signal.input.sample_time),
         (cond_regressor_signal.output.regressor_signal_timeseries, ProcessWorkflow.output.regressor_signal_timeseries),
-        (cond_regressor_signal.output.regressor_signal_unit, ProcessWorkflow.output.regressor_signal_unit),
+        (cond_regressor_signal.output.regressor_signal_units, ProcessWorkflow.output.regressor_signal_units),
         # confounds
         (ProcessWorkflow.input.confounds_df, confounds_std.input.timeseries),
         (confounds_std.output.standardized_timeseries, ProcessWorkflow.output.confounds_signal_df),
@@ -132,10 +132,10 @@ signal_characterics_wf = ProcessWorkflow(
             (ValueNode(True).output.value, regressor_autocorrelation.input.bipolar),
             (regressor_autocorrelation.output.timeshifts, ProcessWorkflow.output.regressor_signal_autocorrelation_timeshifts),
             (regressor_autocorrelation.output.correlations, ProcessWorkflow.output.regressor_signal_autocorrelation_correlations),
-            # regressor signal rms
+            # global signal rms
             (ProcessWorkflow.input.global_signal_timeseries, global_rms.input.timeseries),
             (global_rms.output.rms, ProcessWorkflow.output.global_signal_rms),
-            # regressor autocorrelation
+            # global autocorrelation
             (ProcessWorkflow.input.correlation_window, global_autocorrelation.input.window),
             (ProcessWorkflow.input.correlation_phat, global_autocorrelation.input.phat),
             (ProcessWorkflow.input.sample_time, global_autocorrelation.input.time_step),
@@ -159,8 +159,8 @@ signal_characterics_wf = ProcessWorkflow(
 ##--##--##--##--##--##--##--##--##--##--##--##
 # find timeshift
 ##--##--##--##--##--##--##--##--##--##--##--##
-# iterate correlate over bold timeseries
-iterate_correlate_wf = IteratingNode(Correlate(), iterating_inputs="signal_timeseries_a", iterating_name="bold", description="iterate correlate bold timeseries").setDefaultInputs(boldIter_nr_parallel_processes = -1)
+# iterate correlate over depvars timeseries
+iterate_correlate_wf = IteratingNode(Correlate(), iterating_inputs="signal_timeseries_a", iterating_name="depvars", description="iterate correlate depvars timeseries").setDefaultInputs(depvarsIter_nr_parallel_processes = -1)
 # filter timeshifts
 filter_timeshifts = FilterTimeshifts(description="filter timeshifts")
 # histogram peak
@@ -181,9 +181,9 @@ find_timeshift_wf = ProcessWorkflow(
         (add_none_lower.output.output, ProcessWorkflow.output.align_regressor_absolute_lower_bound),
         (add_none_upper.output.output, ProcessWorkflow.output.align_regressor_absolute_upper_bound),
         # iterate correlate
-        (ProcessWorkflow.input.nr_parallel_processes, iterate_correlate_wf.input.boldIter_nr_parallel_processes),
-        (ProcessWorkflow.input.show_pbar, iterate_correlate_wf.input.boldIter_show_pbar),
-        (ProcessWorkflow.input.bold_signal_timeseries.T, iterate_correlate_wf.input.boldIter_signal_timeseries_a),
+        (ProcessWorkflow.input.nr_parallel_processes, iterate_correlate_wf.input.depvarsIter_nr_parallel_processes),
+        (ProcessWorkflow.input.show_pbar, iterate_correlate_wf.input.depvarsIter_show_pbar),
+        (ProcessWorkflow.input.depvars_signal_timeseries.T, iterate_correlate_wf.input.depvarsIter_signal_timeseries_a),
         (ProcessWorkflow.input.regressor_signal_timeseries, iterate_correlate_wf.input.signal_timeseries_b),
         (ProcessWorkflow.input.sample_time, iterate_correlate_wf.input.time_step),
         (ProcessWorkflow.input.maxcorr_bipolar, iterate_correlate_wf.input.bipolar),
@@ -192,22 +192,22 @@ find_timeshift_wf = ProcessWorkflow(
         (ProcessWorkflow.input.correlation_peak_threshold, iterate_correlate_wf.input.peak_threshold),
         (ProcessWorkflow.input.correlation_multi_peak_strategy, iterate_correlate_wf.input.multi_peak_strategy),
         (ProcessWorkflow.input.reference_regressor_timeshift, iterate_correlate_wf.input.ref_timeshift),
-        (ValueNode(False).output.value, iterate_correlate_wf.input.boldIter_concat_array_outputs),
+        (ValueNode(False).output.value, iterate_correlate_wf.input.depvarsIter_concat_array_outputs),
         (add_none_lower.output.output, iterate_correlate_wf.input.lower_limit),
         (add_none_upper.output.output, iterate_correlate_wf.input.upper_limit),
-        (iterate_correlate_wf.output[("boldIter_timeshifts", "boldIter_correlations", "boldIter_fit_status")] , ProcessWorkflow.output._),
+        (iterate_correlate_wf.output[("depvarsIter_timeshifts", "depvarsIter_correlations", "depvarsIter_fit_status")] , ProcessWorkflow.output._),
         # filter timeshift
         (ProcessWorkflow.input.timeseries_masker, filter_timeshifts.input.timeseries_masker),
         (ProcessWorkflow.input.filter_timeshifts_size, filter_timeshifts.input.size),
         (ProcessWorkflow.input.filter_timeshifts_filter_type, filter_timeshifts.input.filter_type),
         (ProcessWorkflow.input.filter_timeshifts_smooth_fwhm, filter_timeshifts.input.smooth_fwhm),
-        (iterate_correlate_wf.output.boldIter_timeshift_maxcorr, filter_timeshifts.input.timeshift_maxcorr),
-        (iterate_correlate_wf.output.boldIter_maxcorr, filter_timeshifts.input.maxcorr),
-        (iterate_correlate_wf.output.boldIter_timeshifts, filter_timeshifts.input.timeshifts),
-        (iterate_correlate_wf.output.boldIter_correlations, filter_timeshifts.input.correlations),
-        (filter_timeshifts.output.filtered_timeshift_maxcorr, ProcessWorkflow.output.boldIter_timeshift_maxcorr),
-        (iterate_correlate_wf.output.boldIter_fit_status, filter_timeshifts.input.fit_status),
-        (filter_timeshifts.output.filtered_maxcorr, ProcessWorkflow.output.boldIter_maxcorr),
+        (iterate_correlate_wf.output.depvarsIter_timeshift_maxcorr, filter_timeshifts.input.timeshift_maxcorr),
+        (iterate_correlate_wf.output.depvarsIter_maxcorr, filter_timeshifts.input.maxcorr),
+        (iterate_correlate_wf.output.depvarsIter_timeshifts, filter_timeshifts.input.timeshifts),
+        (iterate_correlate_wf.output.depvarsIter_correlations, filter_timeshifts.input.correlations),
+        (filter_timeshifts.output.filtered_timeshift_maxcorr, ProcessWorkflow.output.depvarsIter_timeshift_maxcorr),
+        (iterate_correlate_wf.output.depvarsIter_fit_status, filter_timeshifts.input.fit_status),
+        (filter_timeshifts.output.filtered_maxcorr, ProcessWorkflow.output.depvarsIter_maxcorr),
         # histogram peak
         (filter_timeshifts.output.filtered_timeshift_maxcorr, hist_peak.input.values),
         (hist_peak.output.histogram_peak, ProcessWorkflow.output.histogram_timeshift_peak),
@@ -221,8 +221,8 @@ refine_regressor_mask_timeseries = MaskTimeSeries("refine regressor - mask times
 refine_regressor_mask_timeshifts = MaskTimeSeries("refine regressor - mask timeshift")
 # masked peak
 masked_hist_peak = HistPeak(description="refine regressor masked histogram peak")
-# align bold
-refine_regressor_align_bold = IteratingNode(AlignTimeSeries(), iterating_inputs=("timeseries", "timeshift"), iterating_name="refine", description="refine regressor - align").setDefaultInputs(refineIter_nr_parallel_processes = -1)
+# align depvars
+refine_regressor_align_depvars = IteratingNode(AlignTimeSeries(), iterating_inputs=("timeseries", "timeshift"), iterating_name="refine", description="refine regressor - align").setDefaultInputs(refineIter_nr_parallel_processes = -1)
 # pca reduce timeseries
 refine_regressor_pca_reduce = PCAReducedTimeSeries(description="refine regressor - pca reduce")
 
@@ -236,27 +236,27 @@ refine_regressor_wf = ProcessWorkflow(
         (ValueNode(False).output.value, refine_regressor_find_timeshift.input.maxcorr_bipolar),
         (ProcessWorkflow.input.show_pbar_refine, refine_regressor_find_timeshift.input.show_pbar),
         # mask timeseries
-        (ProcessWorkflow.input.bold_signal_timeseries.T, refine_regressor_mask_timeseries.input.timeseries),
-        (refine_regressor_find_timeshift.output.boldIter_maxcorr >= ProcessWorkflow.input.refine_regressor_correlation_threshold, refine_regressor_mask_timeseries.input.mask),
+        (ProcessWorkflow.input.depvars_signal_timeseries.T, refine_regressor_mask_timeseries.input.timeseries),
+        (refine_regressor_find_timeshift.output.depvarsIter_maxcorr >= ProcessWorkflow.input.refine_regressor_correlation_threshold, refine_regressor_mask_timeseries.input.mask),
         # mask timeshift
-        (refine_regressor_find_timeshift.output.boldIter_timeshift_maxcorr, refine_regressor_mask_timeshifts.input.timeseries),
-        (refine_regressor_find_timeshift.output.boldIter_maxcorr >= ProcessWorkflow.input.refine_regressor_correlation_threshold, refine_regressor_mask_timeshifts.input.mask),
+        (refine_regressor_find_timeshift.output.depvarsIter_timeshift_maxcorr, refine_regressor_mask_timeshifts.input.timeseries),
+        (refine_regressor_find_timeshift.output.depvarsIter_maxcorr >= ProcessWorkflow.input.refine_regressor_correlation_threshold, refine_regressor_mask_timeshifts.input.mask),
         # masked hist peak
         (refine_regressor_mask_timeshifts.output.masked_timeseries, masked_hist_peak.input.values),
         # align
-        (ProcessWorkflow.input.sample_time, refine_regressor_align_bold.input.time_step),
-        (ProcessWorkflow.input.nr_parallel_processes, refine_regressor_align_bold.input.refineIter_nr_parallel_processes),
-        (ProcessWorkflow.input.show_pbar_refine, refine_regressor_align_bold.input.refineIter_show_pbar),
-        (ProcessWorkflow.input.bold_signal_timeseries.shape[0], refine_regressor_align_bold.input.length),
-        (ValueNode(False).output.value, refine_regressor_align_bold.input.refineIter_concat_array_outputs),
-        (refine_regressor_mask_timeseries.output.masked_timeseries, refine_regressor_align_bold.input.refineIter_timeseries),
-        (masked_hist_peak.output.histogram_peak - refine_regressor_mask_timeshifts.output.masked_timeseries, refine_regressor_align_bold.input.refineIter_timeshift),
-        (ValueNode(False).output.value, refine_regressor_align_bold.input.fill_nan),
+        (ProcessWorkflow.input.sample_time, refine_regressor_align_depvars.input.time_step),
+        (ProcessWorkflow.input.nr_parallel_processes, refine_regressor_align_depvars.input.refineIter_nr_parallel_processes),
+        (ProcessWorkflow.input.show_pbar_refine, refine_regressor_align_depvars.input.refineIter_show_pbar),
+        (ProcessWorkflow.input.depvars_signal_timeseries.shape[0], refine_regressor_align_depvars.input.length),
+        (ValueNode(False).output.value, refine_regressor_align_depvars.input.refineIter_concat_array_outputs),
+        (refine_regressor_mask_timeseries.output.masked_timeseries, refine_regressor_align_depvars.input.refineIter_timeseries),
+        (masked_hist_peak.output.histogram_peak - refine_regressor_mask_timeshifts.output.masked_timeseries, refine_regressor_align_depvars.input.refineIter_timeshift),
+        (ValueNode(False).output.value, refine_regressor_align_depvars.input.fill_nan),
         # pca reduce
         (ProcessWorkflow.input.refine_regressor_explained_variance, refine_regressor_pca_reduce.input.explained_variance),
-        (refine_regressor_align_bold.output.refineIter_aligned_timeseries.T, refine_regressor_pca_reduce.input.timeseries),
+        (refine_regressor_align_depvars.output.refineIter_aligned_timeseries.T, refine_regressor_pca_reduce.input.timeseries),
         (refine_regressor_pca_reduce.output.reduced_timeseries.mean(axis = 1), ProcessWorkflow.output.refined_regressor_signal_timeseries),
-        # refined timeshift is zero since bold signals have been shifted to timeshift_peak
+        # refined timeshift is zero since depvars signals have been shifted to timeshift_peak
         (refine_regressor_find_timeshift.output.histogram_timeshift_peak - masked_hist_peak.output.histogram_peak, ProcessWorkflow.output.refined_reference_regressor_timeshift),
     ), description="refine regressor timeseries"
 )
@@ -331,7 +331,7 @@ conditional_dtw = ConditionalNode("do_dtw", {True : dynamic_time_warping_wf, Fal
 
 # downsample confounds
 down_sample_confounds_df = DownsampleTimeSeries(description="down sample confounds df")
-down_sample_bolds_ts = DownsampleTimeSeries(description="down sample bold ts")
+down_sample_depvars_timeseries = DownsampleTimeSeries(description="down sample depvars ts")
 
 # get_regression_confounds_wf = ProcessWorkflow(
 #     (
@@ -384,9 +384,9 @@ get_regression_confounds_wf = ProcessWorkflow(
         # down sample confounds
         (ProcessWorkflow.input.down_sampling_factor, down_sample_confounds_df.input.down_sampling_factor),
         (ProcessWorkflow.input.confounds_signal_df, down_sample_confounds_df.input.timeseries),
-        # down sample bold ts (need to downsample first so spikes don't get lost)
-        (ProcessWorkflow.input.down_sampling_factor, down_sample_bolds_ts.input.down_sampling_factor),
-        (ProcessWorkflow.input.bold_signal_timeseries, down_sample_bolds_ts.input.timeseries),
+        # down sample depvars ts (need to downsample first so spikes don't get lost)
+        (ProcessWorkflow.input.down_sampling_factor, down_sample_depvars_timeseries.input.down_sampling_factor),
+        (ProcessWorkflow.input.depvars_signal_timeseries, down_sample_depvars_timeseries.input.timeseries),
         # motion confounds
         (ProcessWorkflow.input.include_motion_confounds, cond_load_motion_confounds.input.include_motion_confounds),
         (ProcessWorkflow.input.motion_derivatives, cond_load_motion_confounds.input.derivatives),
@@ -397,10 +397,10 @@ get_regression_confounds_wf = ProcessWorkflow(
         (ProcessWorkflow.input._, cond_load_drift_confounds.input[("include_drift_confounds", "drift_high_pass", "drift_model", "drift_order")]),
         (ProcessWorkflow.input.time_step, cond_load_drift_confounds.input.tr),
         (ValueNode(0.5).output.value, cond_load_drift_confounds.input.ref_slice),
-        (down_sample_bolds_ts.output.down_sampled_timeseries.shape[0], cond_load_drift_confounds.input.nr_measurements),
+        (down_sample_depvars_timeseries.output.down_sampled_timeseries.shape[0], cond_load_drift_confounds.input.nr_measurements),
         (cond_load_motion_confounds.output.confounds_df, cond_load_drift_confounds.input.old_confounds_df),
         # spike confounds
-        (down_sample_bolds_ts.output.down_sampled_timeseries, cond_load_spike_confounds.input.bold_data),
+        (down_sample_depvars_timeseries.output.down_sampled_timeseries, cond_load_spike_confounds.input.depvars_timeseries),
         (ProcessWorkflow.input.include_spike_confounds, cond_load_spike_confounds.input.include_spike_confounds),
         (ProcessWorkflow.input.spike_diff_cutoff, cond_load_spike_confounds.input.difference_cutoff),
         (ProcessWorkflow.input.spike_global_cutoff, cond_load_spike_confounds.input.global_cutoff),
@@ -495,7 +495,7 @@ setup_regression_wf = ProcessWorkflow(
         # refine regressor 
         (ProcessWorkflow.input._, recursively_refine_regressor.input["sample_time", "align_regressor_lower_bound", "align_regressor_upper_bound", 'nr_parallel_processes', 'show_pbar', 'correlation_window', 'correlation_phat', 'correlation_peak_threshold', 'correlation_multi_peak_strategy', "refine_regressor_correlation_threshold", 'refine_regressor_explained_variance']),
         (ProcessWorkflow.input.refine_regressor_nr_recursions, recursively_refine_regressor.input.nr_recursions),
-        (signal_timeseries_wf.output.bold_signal_timeseries, recursively_refine_regressor.input.bold_signal_timeseries),
+        (signal_timeseries_wf.output.depvars_signal_timeseries, recursively_refine_regressor.input.depvars_signal_timeseries),
         (signal_timeseries_wf.output.regressor_signal_timeseries, recursively_refine_regressor.input.Init_refined_regressor_signal_timeseries),
         (ValueNode(0).output.value, recursively_refine_regressor.input.Init_refined_reference_regressor_timeshift),
         (ValueNode(False).output.value, recursively_refine_regressor.input.show_pbar_refine),
@@ -519,7 +519,7 @@ setup_regression_wf = ProcessWorkflow(
         (ProcessWorkflow.input.down_sampling_factor, get_regression_confounds_wf.input.down_sampling_factor),
         (ProcessWorkflow.input.sample_time, get_regression_confounds_wf.input.time_step),
         (ProcessWorkflow.input._, get_regression_confounds_wf.input["drift_high_pass", "drift_model", "drift_order", "include_drift_confounds", "include_motion_confounds", "include_spike_confounds", "motion_derivatives", "motion_powers", "spike_diff_cutoff", "spike_global_cutoff"]),
-        (signal_timeseries_wf.output.bold_signal_timeseries, get_regression_confounds_wf.input.bold_signal_timeseries),
+        (signal_timeseries_wf.output.depvars_signal_timeseries, get_regression_confounds_wf.input.depvars_signal_timeseries),
         (signal_timeseries_wf.output.confounds_signal_df, get_regression_confounds_wf.input.confounds_signal_df),
         (get_regression_confounds_wf.output.all, ProcessWorkflow.output._),
         # global_regressor_regression_wf
@@ -549,18 +549,18 @@ setup_regression_wf = ProcessWorkflow(
 
 # %%
 ##############################################
-# iterate align downsample over bold timeseries
+# iterate align downsample over depvars timeseries
 ##############################################
 iterate_cvr_find_timeshift = find_timeshift_wf.copy(description="iterate cvr - find timeshift")
 ##############################################
-# iterate align downsample over bold timeseries
+# iterate align downsample over depvars timeseries
 ##############################################
-iterate_cvr_align_downsample = IteratingNode(align_downsample_wf.copy(), iterating_inputs=("ref_timeseries", "timeshift"), iterating_name="bold", description="iterate cvr – align and downsample").setDefaultInputs(boldIter_nr_parallel_processes = -1)
+iterate_cvr_align_downsample = IteratingNode(align_downsample_wf.copy(), iterating_inputs=("ref_timeseries", "timeshift"), iterating_name="depvars", description="iterate cvr – align and downsample").setDefaultInputs(depvarsIter_nr_parallel_processes = -1)
 
 ##############################################
-# iterate calculate cvr over bold timeseries
+# iterate calculate cvr over depvars timeseries
 ##############################################
-iterate_cvr_regress = IteratingNode(RegressCVR(), iterating_inputs=("dv_ts", "regressor_timeseries"), iterating_name="bold", exclude_outputs=("design_matrix", "betas"), description="iterate cvr – regress").setDefaultInputs(boldIter_nr_parallel_processes = -1)
+iterate_cvr_regress = IteratingNode(RegressCVR(), iterating_inputs=("dv_ts", "regressor_timeseries"), iterating_name="depvars", exclude_outputs=("design_matrix", "betas"), description="iterate cvr – regress").setDefaultInputs(depvarsIter_nr_parallel_processes = -1)
 
 # %%
 iterate_cvr_wf = ProcessWorkflow(
@@ -568,7 +568,7 @@ iterate_cvr_wf = ProcessWorkflow(
         # find timeshift 
         (ProcessWorkflow.input.nr_parallel_processes, iterate_cvr_find_timeshift.input.nr_parallel_processes),
         (ProcessWorkflow.input.show_pbar, iterate_cvr_find_timeshift.input.show_pbar),
-        (ProcessWorkflow.input.bold_signal_timeseries, iterate_cvr_find_timeshift.input.bold_signal_timeseries),
+        (ProcessWorkflow.input.depvars_signal_timeseries, iterate_cvr_find_timeshift.input.depvars_signal_timeseries),
         (ProcessWorkflow.input.sample_time, iterate_cvr_find_timeshift.input.sample_time),
         (ProcessWorkflow.input.timeseries_masker, iterate_cvr_find_timeshift.input.timeseries_masker),
         (ProcessWorkflow.input.align_regressor_lower_bound, iterate_cvr_find_timeshift.input.align_regressor_lower_bound),
@@ -586,27 +586,27 @@ iterate_cvr_wf = ProcessWorkflow(
         (iterate_cvr_find_timeshift.output.all / iterate_cvr_find_timeshift.output.histogram_timeshift_peak, ProcessWorkflow.output._),
         (iterate_cvr_find_timeshift.output.histogram_timeshift_peak, ProcessWorkflow.output.iterate_reference_regressor_timeshift),
         # iterate align downsample 
-        (ProcessWorkflow.input.nr_parallel_processes, iterate_cvr_align_downsample.input.boldIter_nr_parallel_processes),
-        (ProcessWorkflow.input.show_pbar, iterate_cvr_align_downsample.input.boldIter_show_pbar),
-        (ProcessWorkflow.input.bold_signal_timeseries.T, iterate_cvr_align_downsample.input.boldIter_ref_timeseries),
+        (ProcessWorkflow.input.nr_parallel_processes, iterate_cvr_align_downsample.input.depvarsIter_nr_parallel_processes),
+        (ProcessWorkflow.input.show_pbar, iterate_cvr_align_downsample.input.depvarsIter_show_pbar),
+        (ProcessWorkflow.input.depvars_signal_timeseries.T, iterate_cvr_align_downsample.input.depvarsIter_ref_timeseries),
         (ProcessWorkflow.input.sample_time, iterate_cvr_align_downsample.input.sample_time),
         (ProcessWorkflow.input.down_sampling_factor, iterate_cvr_align_downsample.input.down_sampling_factor),
         (ProcessWorkflow.input.regressor_signal_timeseries, iterate_cvr_align_downsample.input.align_timeseries),
-        (ValueNode(False).output.value, iterate_cvr_align_downsample.input.boldIter_concat_array_outputs),
-        (iterate_cvr_find_timeshift.output.boldIter_timeshift_maxcorr, iterate_cvr_align_downsample.input.boldIter_timeshift),
-        (iterate_cvr_align_downsample.output.all / iterate_cvr_align_downsample.output["boldIter_down_sampled_ref_timeseries", "boldIter_down_sampled_aligned_timeseries"], ProcessWorkflow.output._),
-        (iterate_cvr_align_downsample.output.boldIter_down_sampled_ref_timeseries, ProcessWorkflow.output.boldIter_down_sampled_bold_signal_ts),
-        (iterate_cvr_align_downsample.output.boldIter_down_sampled_aligned_timeseries, ProcessWorkflow.output.boldIter_down_sampled_aligned_regressor_signal_timeseries),
+        (ValueNode(False).output.value, iterate_cvr_align_downsample.input.depvarsIter_concat_array_outputs),
+        (iterate_cvr_find_timeshift.output.depvarsIter_timeshift_maxcorr, iterate_cvr_align_downsample.input.depvarsIter_timeshift),
+        (iterate_cvr_align_downsample.output.all / iterate_cvr_align_downsample.output["depvarsIter_down_sampled_ref_timeseries", "depvarsIter_down_sampled_aligned_timeseries"], ProcessWorkflow.output._),
+        (iterate_cvr_align_downsample.output.depvarsIter_down_sampled_ref_timeseries, ProcessWorkflow.output.depvarsIter_down_sampled_depvars_signal_timeseries),
+        (iterate_cvr_align_downsample.output.depvarsIter_down_sampled_aligned_timeseries, ProcessWorkflow.output.depvarsIter_down_sampled_aligned_regressor_signal_timeseries),
         # iterate calculate cvr
-        (ProcessWorkflow.input.nr_parallel_processes, iterate_cvr_regress.input.boldIter_nr_parallel_processes),
-        (ProcessWorkflow.input.show_pbar, iterate_cvr_regress.input.boldIter_show_pbar),
+        (ProcessWorkflow.input.nr_parallel_processes, iterate_cvr_regress.input.depvarsIter_nr_parallel_processes),
+        (ProcessWorkflow.input.show_pbar, iterate_cvr_regress.input.depvarsIter_show_pbar),
         (ProcessWorkflow.input.down_sampled_regression_confounds_signal_df, iterate_cvr_regress.input.confounds_df),
         (ProcessWorkflow.input.confound_regressor_correlation_threshold, iterate_cvr_regress.input.confound_regressor_correlation_threshold),
-        (ValueNode(False).output.value, iterate_cvr_regress.input.boldIter_concat_array_outputs),
-        (iterate_cvr_align_downsample.output.boldIter_down_sampled_ref_timeseries, iterate_cvr_regress.input.boldIter_dv_ts),
-        (iterate_cvr_align_downsample.output.boldIter_down_sampled_aligned_timeseries, iterate_cvr_regress.input.boldIter_regressor_timeseries),
-        (iterate_cvr_regress.output.all - iterate_cvr_regress.output.boldIter_predictions, ProcessWorkflow.output._),
-        (iterate_cvr_regress.output.boldIter_predictions, ProcessWorkflow.output.boldIter_down_sampled_bold_signal_predictions)
+        (ValueNode(False).output.value, iterate_cvr_regress.input.depvarsIter_concat_array_outputs),
+        (iterate_cvr_align_downsample.output.depvarsIter_down_sampled_ref_timeseries, iterate_cvr_regress.input.depvarsIter_dv_ts),
+        (iterate_cvr_align_downsample.output.depvarsIter_down_sampled_aligned_timeseries, iterate_cvr_regress.input.depvarsIter_regressor_timeseries),
+        (iterate_cvr_regress.output.all - iterate_cvr_regress.output.depvarsIter_predictions, ProcessWorkflow.output._),
+        (iterate_cvr_regress.output.depvarsIter_predictions, ProcessWorkflow.output.depvarsIter_down_sampled_depvars_signal_predictions)
     ),
     description="iterate cvr wf"
 )
@@ -620,7 +620,7 @@ regression_wf = ProcessWorkflow(
         (setup_regression_wf.output.all / setup_regression_wf.output.setup_reference_regressor_timeshift, ProcessWorkflow.output._),
         # iterative regression
         (ProcessWorkflow.input._, iterate_cvr_wf.input[("sample_time", "timeseries_masker", "down_sampling_factor", "nr_parallel_processes", "show_pbar", "align_regressor_lower_bound", "align_regressor_upper_bound", "maxcorr_bipolar", "correlation_window", "correlation_phat", "correlation_peak_threshold", "correlation_multi_peak_strategy", "filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "confound_regressor_correlation_threshold")]),
-        (setup_regression_wf.output.bold_signal_timeseries, iterate_cvr_wf.input.bold_signal_timeseries),
+        (setup_regression_wf.output.depvars_signal_timeseries, iterate_cvr_wf.input.depvars_signal_timeseries),
         (setup_regression_wf.output.regressor_signal_timeseries, iterate_cvr_wf.input.regressor_signal_timeseries),
         (setup_regression_wf.output.setup_reference_regressor_timeshift, iterate_cvr_wf.input.reference_regressor_timeshift),
         (setup_regression_wf.output.down_sampled_regression_confounds_signal_df, iterate_cvr_wf.input.down_sampled_regression_confounds_signal_df),

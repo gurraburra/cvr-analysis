@@ -11,7 +11,8 @@ from nilearn.glm.first_level import run_glm
 from scipy import stats
 import warnings
 from multiprocess.sharedctypes import RawArray
-from cvr_analysis.workflows.utils.dev.helper_functions import removeNan
+from cvr_analysis.default.helpers.functions.generic import removeNan
+
 
 # %%
 class XCorr(ProcessNode):

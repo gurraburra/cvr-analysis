@@ -3,9 +3,9 @@ import numpy as np
 
 # process control
 from process_control import *
-from cvr_analysis.workflows.utils.data_computation import PercentageChangeTimeSeries, StandardizeTimeSeries, BaselineTimeSeries
-from cvr_analysis.workflows.utils.dev.confounds import MotionConfounds, DriftConfounds, SpikeConfounds
-from cvr_analysis.workflows.mr.tau.tau_delay import TauDelay
+from cvr_analysis.default.helpers.data_computation import PercentageChangeTimeSeries, StandardizeTimeSeries, BaselineTimeSeries
+from cvr_analysis.default.helpers.helper_classes.confounds import MotionConfounds, DriftConfounds, SpikeConfounds
+from cvr_analysis.default.mr.tau.tau_delay import TauDelay
 
 # %%
 

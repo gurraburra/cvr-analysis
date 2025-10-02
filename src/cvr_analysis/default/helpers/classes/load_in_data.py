@@ -310,7 +310,7 @@ class LoadDopplerData(ProcessNode):
     
 
 class LoadPhysioData(ProcessNode):
-    outputs = ("times", "timeseries", "time_step", "units")
+    outputs = ("times", "timeseries", "time_step", "units", "variables")
     def _run(self, bids_directory : str, subject : str = None, session : str = None, data_type : str = None, task : str = None, acq : str = None, run : str = None, recording : str = None, variables : list = None) -> dict:
         # load json
         physio_json_name =  _checkBIDSQuery("Physio", 
@@ -349,7 +349,10 @@ class LoadPhysioData(ProcessNode):
                                                                                 dtype=float, delimiter='\t')
         
         # check variables
-        if not isinstance(variables, (list,tuple)):
+        if variables is None:
+            variables = tuple(columns)
+            single_var = False
+        elif not isinstance(variables, (list,tuple)):
             variables = (variables,)
             single_var = True
         else:
@@ -369,6 +372,6 @@ class LoadPhysioData(ProcessNode):
 
         # single var?
         if single_var:
-            return t, physio_ts[:,mask][:,0], 1 / samp_freq, units[0]
+            return t, physio_ts[:,mask][:,0], 1 / samp_freq, units[0], variables[0]
         else:
-            return t, physio_ts[:,mask], 1 / samp_freq, units
+            return t, physio_ts[:,mask], 1 / samp_freq, units, variables

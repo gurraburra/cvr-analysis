@@ -5,9 +5,12 @@ from nilearn.masking import compute_epi_mask
 # process control
 from process_control import *
 # custom packages
-from cvr_analysis.workflows.utils.load_in_data import LoadBOLDData, LoadBidsImg, CropBOLDImg, VoxelTimeSeriesMasker, RoiTimeSeriesMasker, GetTimeSeriesEvent
-from cvr_analysis.workflows.utils.signal_processing import NewSampleTime, ResampleTimeSeries, DetrendTimeSeries, TemporalFilterTimeSeries, TimeLimitTimeSeries
-from cvr_analysis.workflows.utils.data_computation import Correlate, AlignTimeSeries
+from cvr_analysis.default.helpers.classes.lo
+ad_in_data import LoadBOLDData, LoadBidsImg, CropBOLDImg, VoxelTimeSeriesMasker, RoiTimeSeriesMasker, GetTimeSeriesEvent
+from cvr_analysis.default.helpers.classes.si
+gnal_processing import NewSampleTime, ResampleTimeSeries, DetrendTimeSeries, TemporalFilterTimeSeries, TimeLimitTimeSeries
+from cvr_analysis.default.helpers.classes.da
+ta_computation import Correlate, AlignTimeSeries
 
 # %%
 
