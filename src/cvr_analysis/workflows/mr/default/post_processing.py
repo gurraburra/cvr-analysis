@@ -322,6 +322,7 @@ global_regressor_align_wf = ProcessWorkflow(
         (ValueNode(False).output.value, global_regressor_correlate.input.bipolar),
         (ProcessWorkflow.input.global_timeseries - ProcessWorkflow.input.global_timeseries.mean() , global_regressor_correlate.input.signal_timeseries_a),
         (ProcessWorkflow.input.regressor_timeseries - ProcessWorkflow.input.regressor_timeseries.mean(), global_regressor_correlate.input.signal_timeseries_b),
+        (global_regressor_correlate.output.timeshift_maxcorr, ProcessWorkflow.output.initial_global_regressor_alignment),
         # align regressor to global
         (ProcessWorkflow.input.sample_time, global_regressor_align.input.time_step),
         (ProcessWorkflow.input.global_timeseries.shape[0], global_regressor_align.input.length),
@@ -480,6 +481,7 @@ signal_processing_wf = ProcessWorkflow(
         (resample_wf.output.new_sample_time, global_regressor_align_wf.input.sample_time),
         (temporal_filter_wf.output.temporal_filtered_global_timeseries, global_regressor_align_wf.input.global_timeseries),
         (temporal_filter_wf.output.temporal_filtered_regressor_timeseries, global_regressor_align_wf.input.regressor_timeseries),
+        (global_regressor_align_wf.output.initial_global_regressor_alignment, ProcessWorkflow.output.initial_global_regressor_alignment),
         # time limit wf
         (ProcessWorkflow.input.analysis_start_time, time_limit_wf.input.analysis_start_time),
         (ProcessWorkflow.input.analysis_end_time, time_limit_wf.input.analysis_end_time),

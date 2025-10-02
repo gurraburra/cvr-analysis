@@ -211,12 +211,12 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
         except:
             print("No regressor img found")
     # get predictions
-    if "prediction" in data_include:
+    if "predictions" in data_include:
         try:
-            predictions_img = image.load_img(os.path.join(folder, preamble + "_desc-prediction_bold.nii.gz"))
-            data.append((norm_func(predictions_img.get_fdata()), "prediction"))
+            predictions_img = image.load_img(os.path.join(folder, preamble + "_desc-predictions_bold.nii.gz"))
+            data.append((norm_func(predictions_img.get_fdata()), "predictions"))
         except:
-            print("No prediction img found")
+            print("No predictions img found")
     # get predictions
     if "correlations" in data_include:
         try:

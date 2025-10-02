@@ -456,7 +456,7 @@ class RegressCVR(ProcessNode):
         # check if no valid entries
         if np.all(nan_entries):
             # return all nans
-            return 0, np.full(design_matrix.shape[1], np.nan), np.full_like(dv_ts, np.nan), np.nan, np.nan, np.nan, design_matrix, np.nan, np.nan, np.nan
+            return 0, np.full(design_matrix.shape[1], np.nan), np.full_like(dv_ts, np.nan), np.nan, np.nan, np.nan, np.nan, design_matrix, np.nan, np.nan
         non_nan_dm = design_matrix[~nan_entries]
         non_nan_bs = dv_ts[~nan_entries]
         # threshold confunds

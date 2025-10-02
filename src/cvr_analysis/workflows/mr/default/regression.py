@@ -304,7 +304,7 @@ dynamic_time_warping_wf = ProcessWorkflow(
         (target_reference_align.output.aligned_timeseries, dtw.input.reference_timeseries),
         (dtw.output.warped_timeseries, ProcessWorkflow.output.warped_timeseries),
     ), description="dynamic time warping wf"
-)
+).setDefaultInputs(dispersion = 10)
 # %%
 no_dtw = ProcessWorkflow(
     (
@@ -331,6 +331,7 @@ conditional_dtw = ConditionalNode("do_dtw", {True : dynamic_time_warping_wf, Fal
 
 # downsample confounds
 down_sample_confounds_df = DownsampleTimeSeries(description="down sample confounds df")
+down_sample_bolds_ts = DownsampleTimeSeries(description="down sample bold ts")
 
 # get_regression_confounds_wf = ProcessWorkflow(
 #     (
@@ -380,30 +381,33 @@ add_constant_confound = CustomNode(addConstantConfound, ("confounds_df",), "add 
 
 get_regression_confounds_wf = ProcessWorkflow(
     (
+        # down sample confounds
+        (ProcessWorkflow.input.down_sampling_factor, down_sample_confounds_df.input.down_sampling_factor),
+        (ProcessWorkflow.input.confounds_signal_df, down_sample_confounds_df.input.timeseries),
+        # down sample bold ts (need to downsample first so spikes don't get lost)
+        (ProcessWorkflow.input.down_sampling_factor, down_sample_bolds_ts.input.down_sampling_factor),
+        (ProcessWorkflow.input.bold_signal_timeseries, down_sample_bolds_ts.input.timeseries),
         # motion confounds
         (ProcessWorkflow.input.include_motion_confounds, cond_load_motion_confounds.input.include_motion_confounds),
-        (ProcessWorkflow.input.confounds_signal_df, cond_load_motion_confounds.input.confounds_df),
         (ProcessWorkflow.input.motion_derivatives, cond_load_motion_confounds.input.derivatives),
         (ProcessWorkflow.input.motion_powers, cond_load_motion_confounds.input.powers),
         (ValueNode(None).output.value, cond_load_motion_confounds.input.old_confounds_df),
+        (down_sample_confounds_df.output.down_sampled_timeseries, cond_load_motion_confounds.input.confounds_df),
         # drift confounds
         (ProcessWorkflow.input._, cond_load_drift_confounds.input[("include_drift_confounds", "drift_high_pass", "drift_model", "drift_order")]),
-        (ProcessWorkflow.input.bold_signal_timeseries.shape[0], cond_load_drift_confounds.input.nr_measurements),
         (ProcessWorkflow.input.time_step, cond_load_drift_confounds.input.tr),
-        (cond_load_motion_confounds.output.confounds_df, cond_load_drift_confounds.input.old_confounds_df),
         (ValueNode(0.5).output.value, cond_load_drift_confounds.input.ref_slice),
+        (down_sample_bolds_ts.output.down_sampled_timeseries.shape[0], cond_load_drift_confounds.input.nr_measurements),
+        (cond_load_motion_confounds.output.confounds_df, cond_load_drift_confounds.input.old_confounds_df),
         # spike confounds
-        (ProcessWorkflow.input.bold_signal_timeseries, cond_load_spike_confounds.input.bold_data),
+        (down_sample_bolds_ts.output.down_sampled_timeseries, cond_load_spike_confounds.input.bold_data),
         (ProcessWorkflow.input.include_spike_confounds, cond_load_spike_confounds.input.include_spike_confounds),
         (ProcessWorkflow.input.spike_diff_cutoff, cond_load_spike_confounds.input.difference_cutoff),
         (ProcessWorkflow.input.spike_global_cutoff, cond_load_spike_confounds.input.global_cutoff),
         (cond_load_drift_confounds.output.confounds_df, cond_load_spike_confounds.input.old_confounds_df),
         # add constant confound
         (cond_load_spike_confounds.output.confounds_df, add_constant_confound.input.confounds_df),
-        # down sample confounds
-        (ProcessWorkflow.input.down_sampling_factor, down_sample_confounds_df.input.down_sampling_factor),
-        (add_constant_confound.output.confounds_df, down_sample_confounds_df.input.timeseries),
-        (down_sample_confounds_df.output.down_sampled_timeseries, ProcessWorkflow.output.down_sampled_regression_confounds_signal_df)
+        (add_constant_confound.output.confounds_df, ProcessWorkflow.output.down_sampled_regression_confounds_signal_df)
     ), description="get regression confounds wf"
 )
 
@@ -476,7 +480,7 @@ global_regressor_regression_wf = ProcessWorkflow(
         (ProcessWorkflow.input.confound_regressor_correlation_threshold, global_regressor_regression.input.confound_regressor_correlation_threshold),
         (global_regressor_align_downsample.output.down_sampled_ref_timeseries, global_regressor_regression.input.dv_ts),
         (global_regressor_align_downsample.output.down_sampled_aligned_timeseries, global_regressor_regression.input.regressor_timeseries),
-        (global_regressor_regression.output.all / global_regressor_regression.output["design_matrix", "betas", "predictions"], ProcessWorkflow.output._),
+        (global_regressor_regression.output.all / global_regressor_regression.output["design_matrix", "betas"], ProcessWorkflow.output._),
     ),
     description="global regressor timeshift and beta wf"
 )
@@ -500,7 +504,7 @@ setup_regression_wf = ProcessWorkflow(
         (ProcessWorkflow.input._, conditional_dtw.input[('sample_time', 'correlation_phat', 'correlation_window', 'do_dtw')]),
         (ProcessWorkflow.input.align_regressor_lower_bound, conditional_dtw.input.target_align_reference_lower_bound),
         (ProcessWorkflow.input.align_regressor_upper_bound, conditional_dtw.input.target_align_reference_upper_bound),
-        (ValueNode(10.0).output.value, conditional_dtw.input.dispersion),
+        (ProcessWorkflow.input.dtw_dispersion, conditional_dtw.input.dispersion),
         (signal_timeseries_wf.output.regressor_signal_timeseries, conditional_dtw.input.reference_timeseries),
         (recursively_refine_regressor.output.Rec_refined_regressor_signal_timeseries, conditional_dtw.input.target_timeseries),
         (conditional_dtw.output.warped_timeseries, ProcessWorkflow.output.regressor_signal_timeseries),
@@ -531,6 +535,7 @@ setup_regression_wf = ProcessWorkflow(
         (global_regressor_regression_wf.output.down_sampled_global_signal_timeseries, ProcessWorkflow.output.down_sampled_global_signal_timeseries),
         (global_regressor_regression_wf.output.down_sampled_global_aligned_regressor_signal_timeseries, ProcessWorkflow.output.down_sampled_global_aligned_regressor_signal_timeseries),
         (global_regressor_regression_wf.output.regressor_beta, ProcessWorkflow.output.global_regressor_beta),
+        (global_regressor_regression_wf.output.predictions, ProcessWorkflow.output.global_regressor_predictions),
         
     ),
     description="setup regression wf"
