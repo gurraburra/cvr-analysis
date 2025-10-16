@@ -101,8 +101,9 @@ time_limit_regressor_series = TimeLimitTimeSeries(description="time_limit regres
 time_limit_global_series = TimeLimitTimeSeries(description="time_limit global series")
 
 # %%
-# time_limit time wf
-time_limit_wf = ProcessWorkflow(
+# timelimit can be first step after resampling or last step in postproccesing
+# initial time_limit time wf
+initial_time_limit_wf = ProcessWorkflow(
     (
         # time_limit depvars timeseries
         (ProcessWorkflow.input.analysis_start_time, time_limit_depvars_timeseries.input.start_time),
@@ -135,7 +136,18 @@ time_limit_wf = ProcessWorkflow(
     ),
     description="time limit workflow"
 )
-
+# after
+late_time_limit_wf = initial_time_limit_wf.copy()
+# no timelimit
+time_limit_times = ProcessWorkflow(
+    (
+        (ProcessWorkflow.input.analysis_start_time, ProcessWorkflow.output.analysis_start_time),
+        (ProcessWorkflow.input.analysis_end_time, ProcessWorkflow.output.analysis_end_time),
+    ), description="time_limits_times"
+)
+# pass None for no timelimte
+cond_init_time_limit_times = ConditionalNode("initial_time_limit",{True : time_limit_times, False : None})
+cond_late_time_limit_times = ConditionalNode("late_time_limit",{True : time_limit_times, False : None})
 # %%
 ##############################################
 # detrend timeseries
@@ -220,12 +232,24 @@ post_processing_wf = ProcessWorkflow(
         (ProcessWorkflow.input._, resample_wf.input.all),
         (resample_wf.output.up_sampling_factor, ProcessWorkflow.output.up_sampling_factor),
         (resample_wf.output.new_sample_time, ProcessWorkflow.output.up_sampled_sample_time),
+        # initial timelimits
+        (ProcessWorkflow.input.initial_time_limit, cond_init_time_limit_times.input.initial_time_limit),
+        (ProcessWorkflow.input.analysis_start_time, cond_init_time_limit_times.input.analysis_start_time),
+        (ProcessWorkflow.input.analysis_end_time, cond_init_time_limit_times.input.analysis_end_time),
+        # initial time limit wf
+        (cond_init_time_limit_times.output.analysis_start_time, initial_time_limit_wf.input.analysis_start_time),
+        (cond_init_time_limit_times.output.analysis_end_time, initial_time_limit_wf.input.analysis_end_time),
+        (resample_wf.output.new_sample_time, initial_time_limit_wf.input.sample_time),
+        (resample_wf.output.resampled_depvars_timeseries, initial_time_limit_wf.input.depvars_timeseries),
+        (resample_wf.output.resampled_confounds_df, initial_time_limit_wf.input.confounds_df),
+        (resample_wf.output.resampled_regressor_timeseries, initial_time_limit_wf.input.regressor_timeseries),
+        (resample_wf.output.resampled_global_timeseries, initial_time_limit_wf.input.global_timeseries),
         # detrend wf
         (ProcessWorkflow.input.detrend_linear_order, detrend_wf.input.detrend_linear_order),
-        (resample_wf.output.resampled_depvars_timeseries, detrend_wf.input.depvars_timeseries),
-        (resample_wf.output.resampled_confounds_df, detrend_wf.input.confounds_df),
-        (resample_wf.output.resampled_regressor_timeseries, detrend_wf.input.regressor_timeseries),
-        (resample_wf.output.resampled_global_timeseries, detrend_wf.input.global_timeseries),
+        (initial_time_limit_wf.output.time_limited_depvars_timeseries, detrend_wf.input.depvars_timeseries),
+        (initial_time_limit_wf.output.time_limited_confounds_df, detrend_wf.input.confounds_df),
+        (initial_time_limit_wf.output.time_limited_regressor_timeseries, detrend_wf.input.regressor_timeseries),
+        (initial_time_limit_wf.output.time_limited_global_timeseries, detrend_wf.input.global_timeseries),
         # temporal filter
         (ProcessWorkflow.input._, temporal_filter_wf.input.temporal_filter_freq),
         (resample_wf.output.new_sample_time, temporal_filter_wf.input.sample_time),
@@ -239,20 +263,24 @@ post_processing_wf = ProcessWorkflow(
         (temporal_filter_wf.output.temporal_filtered_global_timeseries, global_regressor_align_wf.input.global_timeseries),
         (temporal_filter_wf.output.temporal_filtered_regressor_timeseries, global_regressor_align_wf.input.regressor_timeseries),
         (global_regressor_align_wf.output.initial_global_regressor_alignment, ProcessWorkflow.output.initial_global_regressor_alignment),
-        # time limit wf
-        (ProcessWorkflow.input.analysis_start_time, time_limit_wf.input.analysis_start_time),
-        (ProcessWorkflow.input.analysis_end_time, time_limit_wf.input.analysis_end_time),
-        (resample_wf.output.new_sample_time, time_limit_wf.input.sample_time),
-        (temporal_filter_wf.output.temporal_filtered_depvars_timeseries, time_limit_wf.input.depvars_timeseries),
-        (temporal_filter_wf.output.temporal_filtered_confounds_df, time_limit_wf.input.confounds_df),
-        (global_regressor_align_wf.output.global_aligned_regressor_timeseries, time_limit_wf.input.regressor_timeseries),
-        (temporal_filter_wf.output.temporal_filtered_global_timeseries, time_limit_wf.input.global_timeseries),
-        (time_limit_wf.output.time_limited_depvars_timeseries, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_depvars_timeseries),
-        (time_limit_wf.output.time_limited_confounds_df, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_confounds_df),
-        (time_limit_wf.output.time_limited_regressor_timeseries, ProcessWorkflow.output.time_limited_global_aligned_temporal_filtered_detrended_up_sampled_regressor_timeseries),
-        (time_limit_wf.output.time_limited_global_timeseries, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_global_timeseries),
+        # late timelimits
+        (not_* ProcessWorkflow.input.initial_time_limit, cond_late_time_limit_times.input.late_time_limit),
+        (ProcessWorkflow.input.analysis_start_time, cond_late_time_limit_times.input.analysis_start_time),
+        (ProcessWorkflow.input.analysis_end_time, cond_late_time_limit_times.input.analysis_end_time),
+        # late time limit wf
+        (cond_late_time_limit_times.output.analysis_start_time, late_time_limit_wf.input.analysis_start_time),
+        (cond_late_time_limit_times.output.analysis_end_time, late_time_limit_wf.input.analysis_end_time),
+        (resample_wf.output.new_sample_time, late_time_limit_wf.input.sample_time),
+        (temporal_filter_wf.output.temporal_filtered_depvars_timeseries, late_time_limit_wf.input.depvars_timeseries),
+        (temporal_filter_wf.output.temporal_filtered_confounds_df, late_time_limit_wf.input.confounds_df),
+        (global_regressor_align_wf.output.global_aligned_regressor_timeseries, late_time_limit_wf.input.regressor_timeseries),
+        (temporal_filter_wf.output.temporal_filtered_global_timeseries, late_time_limit_wf.input.global_timeseries),
+        (late_time_limit_wf.output.time_limited_depvars_timeseries, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_depvars_timeseries),
+        (late_time_limit_wf.output.time_limited_confounds_df, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_confounds_df),
+        (late_time_limit_wf.output.time_limited_regressor_timeseries, ProcessWorkflow.output.time_limited_global_aligned_temporal_filtered_detrended_up_sampled_regressor_timeseries),
+        (late_time_limit_wf.output.time_limited_global_timeseries, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_global_timeseries),
     ),
     description="post-processing wf"
-)
+).setDefaultInputs(initial_time_limit = False)
 
 # %%

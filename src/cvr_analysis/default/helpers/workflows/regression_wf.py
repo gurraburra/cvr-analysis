@@ -332,6 +332,7 @@ conditional_dtw = ConditionalNode("do_dtw", {True : dynamic_time_warping_wf, Fal
 # downsample confounds
 down_sample_confounds_df = DownsampleTimeSeries(description="down sample confounds df")
 down_sample_depvars_timeseries = DownsampleTimeSeries(description="down sample depvars ts")
+down_sample_global_timeseries = DownsampleTimeSeries(description="down sample global ts")
 
 # get_regression_confounds_wf = ProcessWorkflow(
 #     (
@@ -387,6 +388,9 @@ get_regression_confounds_wf = ProcessWorkflow(
         # down sample depvars ts (need to downsample first so spikes don't get lost)
         (ProcessWorkflow.input.down_sampling_factor, down_sample_depvars_timeseries.input.down_sampling_factor),
         (ProcessWorkflow.input.depvars_signal_timeseries, down_sample_depvars_timeseries.input.timeseries),
+        # down sample global ts (need to downsample first so spikes don't get lost)
+        (ProcessWorkflow.input.down_sampling_factor, down_sample_global_timeseries.input.down_sampling_factor),
+        (ProcessWorkflow.input.global_signal_timeseries, down_sample_global_timeseries.input.timeseries),
         # motion confounds
         (ProcessWorkflow.input.include_motion_confounds, cond_load_motion_confounds.input.include_motion_confounds),
         (ProcessWorkflow.input.motion_derivatives, cond_load_motion_confounds.input.derivatives),
@@ -401,6 +405,7 @@ get_regression_confounds_wf = ProcessWorkflow(
         (cond_load_motion_confounds.output.confounds_df, cond_load_drift_confounds.input.old_confounds_df),
         # spike confounds
         (down_sample_depvars_timeseries.output.down_sampled_timeseries, cond_load_spike_confounds.input.depvars_timeseries),
+        (down_sample_global_timeseries.output.down_sampled_timeseries, cond_load_spike_confounds.input.global_timeseries),
         (ProcessWorkflow.input.include_spike_confounds, cond_load_spike_confounds.input.include_spike_confounds),
         (ProcessWorkflow.input.spike_diff_cutoff, cond_load_spike_confounds.input.difference_cutoff),
         (ProcessWorkflow.input.spike_global_cutoff, cond_load_spike_confounds.input.global_cutoff),
@@ -520,6 +525,7 @@ setup_regression_wf = ProcessWorkflow(
         (ProcessWorkflow.input.sample_time, get_regression_confounds_wf.input.time_step),
         (ProcessWorkflow.input._, get_regression_confounds_wf.input["drift_high_pass", "drift_model", "drift_order", "include_drift_confounds", "include_motion_confounds", "include_spike_confounds", "motion_derivatives", "motion_powers", "spike_diff_cutoff", "spike_global_cutoff"]),
         (signal_timeseries_wf.output.depvars_signal_timeseries, get_regression_confounds_wf.input.depvars_signal_timeseries),
+        (signal_timeseries_wf.output.global_signal_timeseries, get_regression_confounds_wf.input.global_signal_timeseries),
         (signal_timeseries_wf.output.confounds_signal_df, get_regression_confounds_wf.input.confounds_signal_df),
         (get_regression_confounds_wf.output.all, ProcessWorkflow.output._),
         # global_regressor_regression_wf

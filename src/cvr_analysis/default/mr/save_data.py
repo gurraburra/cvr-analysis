@@ -20,7 +20,7 @@ from nilearn.maskers import NiftiLabelsMasker
 def createHashCheckOverride(
                         output_directory, subject, session, task, run, space,
                                 voxel_mask, roi_masker, spatial_smoothing_fwhm, 
-                                    analysis_start_time, analysis_end_time, min_sample_freq, 
+                                    initial_time_limit, analysis_start_time, analysis_end_time, min_sample_freq, 
                                         detrend_linear_order, temporal_filter_freq, 
                                             baseline_strategy, regressor, 
                                             # confounds
@@ -93,7 +93,11 @@ def createHashCheckOverride(
     # dtw disperion
     if not do_dtw:
         dtw_dispersion = None
-   
+    
+    # initial time limit
+    if analysis_start_time is None and analysis_end_time is None:
+        initial_time_limit = None
+        
     # analysis info
     analysis_info = {
         "analysis-name"                             : str(analysis_name),
@@ -101,6 +105,7 @@ def createHashCheckOverride(
         "roi-masker"                                : try_conv(roi_masker, str),
         "spatial-smoothing-fwhm"                    : try_conv(spatial_smoothing_fwhm, float),
         "min-sample-freq"                           : try_conv(min_sample_freq, float),
+        "initial-time-limit"                        : try_conv(initial_time_limit, bool),
         "analysis-bounds"                           : try_conv((analysis_start_time, analysis_end_time), float),
         "detrend-linear-order"                      : try_conv(detrend_linear_order, int),
         "temporal-filter-freq"                      : try_conv(temporal_filter_freq, float),
@@ -122,8 +127,8 @@ def createHashCheckOverride(
         "dtw-to-ensure-regressor-units"             : bool(do_dtw),
         "dtw-dispersion"                            : try_conv(dtw_dispersion, float),
         "include-motion-confounds"                  : bool(include_motion_confounds),
-        "include-drift-confounds"                   : bool(include_motion_confounds),
-        "include-spike-confounds"                   : bool(include_motion_confounds),
+        "include-drift-confounds"                   : bool(include_drift_confounds),
+        "include-spike-confounds"                   : bool(include_spike_confounds),
         "drift-high-pass"                           : try_conv(drift_high_pass, float),
         "drift-model"                               : try_conv(drift_model, str),
         "drift-order"                               : try_conv(drift_order, int),
@@ -266,7 +271,7 @@ def saveData(
                 # global regressor
                 desc = "globalRegressorFit"
                 saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, regression_sample_time)
-                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "prediction"]).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
+                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "predictions"]).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
             if "globalregressorxcorrelation" in data_save_list: 
                 # global regressor correlations
                 desc = "globalRegressorrXCorrelation"

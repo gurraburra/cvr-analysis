@@ -48,8 +48,9 @@ check_units = CustomNode(checkUnits, outputs=("units", ))
 load_data_wf = ProcessWorkflow(
     (
         # doppler_data
-        (ProcessWorkflow.input._, doppler_loader.input.all - doppler_loader.input[("variables", "data_type")]),
+        (ProcessWorkflow.input._, doppler_loader.input.all - doppler_loader.input[("variables", "data_type", "recording")]),
         (ProcessWorkflow.input.doppler_variables, doppler_loader.input.variables),
+        (ProcessWorkflow.input.doppler_recording, doppler_loader.input.recording),
         (ValueNode("doppler").output.value, doppler_loader.input.data_type),
         (doppler_loader.output.times, ProcessWorkflow.output.doppler_times),
         (doppler_loader.output.time_step,  ProcessWorkflow.output.doppler_tr),

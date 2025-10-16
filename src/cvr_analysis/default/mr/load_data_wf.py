@@ -55,8 +55,9 @@ roi_masker = RoiTimeSeriesMasker(description="create roi timeseries masker")
 load_create_roi_masker = ProcessWorkflow(
     (
         # labels masker loader
-        (ProcessWorkflow.input._, label_masker_loader.input.all / label_masker_loader.input.suffix),
+        (ProcessWorkflow.input._, label_masker_loader.input.all / label_masker_loader.input.suffix / label_masker_loader.input.data_type),
         (ValueNode("dseg").output.value, label_masker_loader.input.suffix),
+        (ValueNode("func").output.value, label_masker_loader.input.data_type),
         # create timeseries masker
         (ProcessWorkflow.input._, roi_masker.input[("voxel_mask_img", "spatial_smoothing_fwhm")]),
         (label_masker_loader.output.bids_img, roi_masker.input.labels_img),
@@ -96,8 +97,9 @@ load_data_wf = ProcessWorkflow(
         (bold_loader.output.tr,  ProcessWorkflow.output.bold_tr),
         (bold_loader.output.nr_measurements,  ProcessWorkflow.output.nr_measurements),
         # voxel mask loader
-        (ProcessWorkflow.input._, voxel_mask_loader.input.all / voxel_mask_loader.input[("suffix", "bold_img")]),
+        (ProcessWorkflow.input._, voxel_mask_loader.input.all / voxel_mask_loader.input[("suffix", "bold_img", "data_type")]),
         (ValueNode("mask").output.value, voxel_mask_loader.input.suffix),
+        (ValueNode("func").output.value, voxel_mask_loader.input.data_type),
         (bold_loader.output.bold_img, voxel_mask_loader.input.bold_img),
         (voxel_mask_loader.output.voxel_mask_img, ProcessWorkflow.output.voxel_mask_img),
         # crop bold data

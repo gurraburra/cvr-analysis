@@ -15,13 +15,18 @@ from pathlib import Path
 # create hash
 ##############################################
 def createHashCheckOverride(
-                        output_directory, subject, session, task, run, regressor,
-                                analysis_start_time, analysis_end_time, min_sample_freq, add_global_signal,
-                                    detrend_linear_order, temporal_filter_freq, baseline_strategy, 
-                                            global_align_regressor_lower_bound, global_align_regressor_upper_bound,
-                                                maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, 
-                                                    correlation_phat, correlation_window, correlation_multi_peak_strategy, correlation_peak_threshold,
-                                                        force_run = False): 
+                        output_directory, subject, session, task, run,
+                            initial_time_limit, analysis_start_time, analysis_end_time, min_sample_freq, 
+                                detrend_linear_order, temporal_filter_freq, 
+                                    baseline_strategy, regressor, 
+                                    # confounds
+                                    include_drift_confounds, include_spike_confounds, 
+                                    drift_high_pass, drift_model, drift_order, 
+                                    spike_diff_cutoff, spike_global_cutoff,
+                                        global_align_regressor_lower_bound, global_align_regressor_upper_bound,
+                                            maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, 
+                                                correlation_phat, correlation_window, correlation_multi_peak_strategy, correlation_peak_threshold,
+                                                    force_run = False): 
     # folder for files
     analysis_name = "TCD-CVR-version-" + __version__ 
     files_folder = os.path.join(output_directory, f"sub-{subject}", f"ses-{session}", analysis_name)
@@ -39,6 +44,16 @@ def createHashCheckOverride(
     if detrend_linear_order is not None and int(detrend_linear_order) == 0:
         detrend_linear_order = None
 
+    # confounds
+    if not include_drift_confounds:
+        drift_high_pass = None
+        drift_model = None
+        drift_order = None
+
+    if not include_spike_confounds:
+        spike_diff_cutoff = None
+        spike_global_cutoff = None
+
     # check if refining regressor, if not change parameters
     if correlation_multi_peak_strategy is None:
         correlation_peak_threshold = None
@@ -46,13 +61,17 @@ def createHashCheckOverride(
     # check if aligning, if not change parameters
     if align_regressor_lower_bound is not None and align_regressor_upper_bound is not None and align_regressor_lower_bound == align_regressor_upper_bound:
         maxcorr_bipolar = None
+
+    # initial time limit
+    if analysis_start_time is None and analysis_end_time is None:
+        initial_time_limit = None
    
     # analysis info
     analysis_info = {
         "analysis-name"                             : str(analysis_name),
         "min-sample-freq"                           : try_conv(min_sample_freq, float),
+        "initial-time-limit"                        : try_conv(initial_time_limit, bool),
         "analysis-bounds"                           : try_conv((analysis_start_time, analysis_end_time), float),
-        "add-global-signal"                         : try_conv(add_global_signal, bool),
         "detrend-linear-order"                      : try_conv(detrend_linear_order, int),
         "temporal-filter-freq"                      : try_conv(temporal_filter_freq, float),
         "baseline-strategy"                         : try_conv(baseline_strategy, str),
@@ -64,6 +83,13 @@ def createHashCheckOverride(
         "correlation-window"                        : try_conv(correlation_window, str),
         "correlation-multi-peak-strategy"           : try_conv(correlation_multi_peak_strategy, str),
         "correlation-peak-threshold"                : try_conv(correlation_peak_threshold, float),
+        "include-drift-confounds"                   : bool(include_drift_confounds),
+        "include-spike-confounds"                   : bool(include_spike_confounds),
+        "drift-high-pass"                           : try_conv(drift_high_pass, float),
+        "drift-model"                               : try_conv(drift_model, str),
+        "drift-order"                               : try_conv(drift_order, int),
+        "spike-diff-cutoff"                         : try_conv(spike_diff_cutoff, float),
+        "spike-global-cutoff"                       : try_conv(spike_global_cutoff, float),
     }
 
     # analysis id
@@ -109,8 +135,10 @@ def saveData(
                                                         # doppler regression data
                                                         doppler_dof, doppler_predictions, doppler_r_squared, doppler_adjusted_r_squared, doppler_standard_error, doppler_t_value,
                                                             doppler_cvr_amplitude, doppler_p_value, regression_sample_time, doppler_units,
-                                                                # data to save
-                                                                data_to_save = "cvr+tshift+pvalue") -> tuple:
+                                                                # confounds
+                                                                regression_confounds_df,
+                                                                    # data to save
+                                                                    data_to_save = "cvr+tshift+pvalue") -> tuple:
         # timeseries info
         def saveTimeseriesInfo(name, start_time, time_step):
             dict_ = {"start-time" : start_time, "time-step" : time_step}
@@ -136,38 +164,37 @@ def saveData(
                 raise ValueError("'data_to_save' needs to be string or list.")
             # check if all data specified in available
             available_data = {"postproc", "xcorrelations", "alignedregressor", "predictions", 
-                              "cvr", "tshift", "pvalue", "tvalue", "se", "rsquared", "adjustedrsquared", "maxcorr", "dof", 
                                 "initialglobalalignedregressorseries", "globalregressorfit",
                                     "globalregressorxcorrelation", "globalautocorrelation", "regressorautocorrelation", 
-                                        "confounds", "mask"}
+                                        "confounds"}
             non_available_data = set(data_save_list) - available_data 
             if non_available_data:
                 raise ValueError(f"Following data is not available: {non_available_data}")
             # 2D data
             if "postproc" in data_save_list:
-                desc = "postproc"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, up_sampled_sample_time)
-                pd.DataFrame(doppler_postproc_timeseries.T, columns=doppler_variables).to_csv(preamble + f"desc-{desc}_doppler.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                postfix = "desc-postproc_doppler"
+                saveTimeseriesInfo(preamble + postfix + ".json", 0, up_sampled_sample_time)
+                pd.DataFrame(doppler_postproc_timeseries.T, columns=doppler_variables).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             if "predictions" in data_save_list:
-                desc = "predictions"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, regression_sample_time)
-                pd.DataFrame(doppler_predictions.T, columns=doppler_variables).to_csv(preamble + f"desc-{desc}_doppler.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                postfix = "desc-predictions_doppler"
+                saveTimeseriesInfo(preamble + postfix + ".json", 0, regression_sample_time)
+                pd.DataFrame(doppler_predictions.T, columns=doppler_variables).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             if "alignedregressor":
-                desc = "alignedRegressor"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, regression_sample_time)
-                pd.DataFrame(doppler_aligned_regressor_timeseries.T, columns=doppler_variables).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                postfix = "desc-alignedRegressor_timeseries"
+                saveTimeseriesInfo(preamble + postfix + ".json", 0, regression_sample_time)
+                pd.DataFrame(doppler_aligned_regressor_timeseries.T, columns=doppler_variables).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             if "xcorrelations" in data_save_list:
-                desc = "xCorrelations"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", doppler_timeshifts[0,0], regression_sample_time)
-                pd.DataFrame(doppler_correlations.T, columns=doppler_variables).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                postfix = "desc-xCorrelations_timeseries"
+                saveTimeseriesInfo(preamble + postfix + ".json", doppler_timeshifts[0,0], regression_sample_time)
+                pd.DataFrame(doppler_correlations.T, columns=doppler_variables).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             # dataframe data
             df_dict = {
                 "signal" : doppler_variables,
-                "unit" : doppler_units,
-                "mean" : doppler_postproc_timeseries.mean(axis = 0),
-                "max" : doppler_postproc_timeseries.max(axis = 0),
-                "min" : doppler_postproc_timeseries.min(axis = 0),
-                "std" : doppler_postproc_timeseries.std(axis = 0),
+                "unit" : [doppler_units]*len(doppler_variables),
+                "mean" : doppler_postproc_timeseries.mean(axis = 1),
+                "max" : doppler_postproc_timeseries.max(axis = 1),
+                "min" : doppler_postproc_timeseries.min(axis = 1),
+                "std" : doppler_postproc_timeseries.std(axis = 1),
                 "cvr" : doppler_cvr_amplitude,
                 "timeshift" : doppler_timeshift_maxcorr, 
                 "maxcorr" : doppler_maxcorr,
@@ -182,30 +209,39 @@ def saveData(
             # 1D data
             if "initialglobalalignedregressorseries" in data_save_list:
                 # global regressor
-                desc = "initialGlobalAlignedRegressorSeries"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, up_sampled_sample_time)
-                pd.DataFrame(np.vstack((global_postproc_timeseries, initial_global_aligned_regressor_timeseries)).T, columns=["global_series", "aligned_regressor_series"]).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
+                postfix = "desc-initialGlobalAlignedRegressorSeries_timeseries"
+                saveTimeseriesInfo(preamble + postfix + ".json", 0, up_sampled_sample_time)
+                pd.DataFrame(np.vstack((global_postproc_timeseries, initial_global_aligned_regressor_timeseries)).T, columns=["global_series", "aligned_regressor_series"]).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, compression="gzip")
             if "globalregressorfit" in data_save_list:
                 # global regressor
-                desc = "globalRegressorFit"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, regression_sample_time)
-                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "prediction"]).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
+                postfix = "desc-globalRegressorFit_timeseries"
+                saveTimeseriesInfo(preamble + postfix + ".json", 0, regression_sample_time)
+                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "predictions"]).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, compression="gzip")
             if "globalregressorxcorrelation" in data_save_list: 
                 # global regressor correlations
-                desc = "globalRegressorrXCorrelation"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", global_regressor_timeshifts[0], up_sampled_sample_time)
-                pd.Series(global_regressor_correlations).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, header=False, compression="gzip")
+                postfix = "desc-globalRegressorrXCorrelation_timeseries"
+                saveTimeseriesInfo(preamble + postfix + ".json", global_regressor_timeshifts[0], up_sampled_sample_time)
+                pd.Series(global_regressor_correlations).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header=False, compression="gzip")
             if "regressorautocorrelation" in data_save_list: 
                 # regressor autocorrelation
-                desc = "regressorAutocorrelation"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(regressor_autocorrelation_correlations).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+                postfix = "desc-regressorAutocorrelation_timeseries"
+                saveTimeseriesInfo(preamble + postfix + ".json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
+                pd.Series(regressor_autocorrelation_correlations).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
             if "globalautocorrelation" in data_save_list:
                 # global autocorrelation
-                desc = "globalAutocorrelation"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", global_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(global_autocorrelation_correlations).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+                postfix = "desc-globalAutocorrelation_timeseries"
+                saveTimeseriesInfo(preamble + postfix + ".json", global_autocorrelation_timeshifts[0], up_sampled_sample_time)
+                pd.Series(global_autocorrelation_correlations).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+            if "confounds" in data_save_list and regression_confounds_df is not None:
+                # confounds
+                postfix = "desc-confounds_timeseries"
+                saveTimeseriesInfo(preamble + postfix + ".json", 0, regression_sample_time)
+                regression_confounds_df.to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, compression="gzip")
             # 1D data
+            if regression_confounds_df is not None:
+                confounds_names = list(regression_confounds_df.columns)
+            else:
+                confounds_names = None
             data_info = {
                         # pre-processing data
                         "subject"                               : subject,
@@ -228,7 +264,9 @@ def saveData(
                         "global-rms"                            : global_rms,
                         # doppler alignment data
                         "reference-regressor-timeshift"         : reference_regressor_timeshift, 
-                        "align-regressor-absolute-bounds"       : (align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound)
+                        "align-regressor-absolute-bounds"       : (align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound),
+                        # confound names
+                        "confounds-names"                       : confounds_names
                     }
             with open(preamble + "desc-data_info.json", "w") as info_file:
                 json.dump(data_info, info_file, indent='\t')

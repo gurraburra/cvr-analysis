@@ -54,16 +54,15 @@ class DriftConfounds(ProcessNode):
 class SpikeConfounds(ProcessNode):
     outputs = ("confounds_df", )
     
-    def _run(self, depvars_timeseries : np.ndarray, global_cutoff : float = 3, difference_cutoff : float = 3, old_confounds_df : pd.DataFrame = None) -> tuple:
-        global_mean = depvars_timeseries.mean(axis = 1)
-        global_spikes = np.append(np.where(global_mean > global_mean.mean() + global_mean.std() * global_cutoff),
-                                    np.where(global_mean < global_mean.mean() - global_mean.std() * global_cutoff))
+    def _run(self, depvars_timeseries : np.ndarray, global_timeseries : np.ndarray, global_cutoff : float = 3, difference_cutoff : float = 3, old_confounds_df : pd.DataFrame = None) -> tuple:
+        global_spikes = np.append(np.where(global_timeseries > global_timeseries.mean() + global_timeseries.std() * global_cutoff),
+                                    np.where(global_timeseries < global_timeseries.mean() - global_timeseries.std() * global_cutoff))
 
         frame_diff = np.mean(np.abs(np.diff(depvars_timeseries, axis=0)), axis = 1)
         diff_spikes = np.append(np.where(frame_diff > np.mean(frame_diff) + np.std(frame_diff) * difference_cutoff),
                                     np.where(frame_diff < np.mean(frame_diff) - np.std(frame_diff) * difference_cutoff))
         # build spike regressors
-        spikes = pd.DataFrame([x + 1 for x in range(len(global_mean))], columns=["TR"])
+        spikes = pd.DataFrame([x + 1 for x in range(len(global_timeseries))], columns=["TR"])
         for i, loc in enumerate(global_spikes):
             spikes["spike_global" + str(i + 1)] = 0
             spikes.loc[int(loc),"spike_global" + str(i + 1)] = 1

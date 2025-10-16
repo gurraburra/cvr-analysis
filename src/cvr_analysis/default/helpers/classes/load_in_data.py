@@ -7,11 +7,11 @@ import os
 import json
 import numpy as np
 
-def _checkBIDSQuery(file : str, files : list[str]) -> str:
+def _checkBIDSQuery(file : str, files : list[str], search_str : str) -> str:
     if len(files) == 0:
-        raise ValueError(f"Could not find {file} file.")
+        raise ValueError(f"Could not find '{file}' file using search pattern '{search_str}'.")
     elif len(files) > 1:
-        raise ValueError(f"Found multiple {file} files.")
+        raise ValueError(f"Found multiple {file} files using search pattern '{search_str}'.")
     else:
         return files[0]
     
@@ -65,7 +65,7 @@ def _getBIDSFiles(bids_directory, subject, session=None, data_type=None, task=No
         file_spec += '*'
     # seach pattern
     search_pattern = os.path.join(base_dir, file_spec)
-    return glob(search_pattern)
+    return glob(search_pattern), search_pattern
     
 
 class LoadBOLDData(ProcessNode):
@@ -75,7 +75,7 @@ class LoadBOLDData(ProcessNode):
         # load bild data
         bold_img = image.load_img(
                         _checkBIDSQuery("BOLD", 
-                            _getBIDSFiles(
+                            *_getBIDSFiles(
                                         bids_directory,
                                             subject=subject, 
                                                 session=session, 
@@ -89,7 +89,7 @@ class LoadBOLDData(ProcessNode):
         nr_meas = bold_img.shape[3]
 
         bold_physio_json = _checkBIDSQuery("BOLD JSON", 
-                            _getBIDSFiles(
+                            *_getBIDSFiles(
                                         bids_directory,
                                             subject=subject, 
                                                 session=session, 
@@ -109,7 +109,7 @@ class LoadBOLDData(ProcessNode):
         if load_confounds:
             confounds_df = pd.read_csv(
                                 _checkBIDSQuery("confounds", 
-                                    _getBIDSFiles(
+                                    *_getBIDSFiles(
                                         bids_directory,
                                             subject=subject, 
                                                 session=session, 
@@ -131,23 +131,24 @@ class LoadBOLDData(ProcessNode):
 class LoadBidsImg(ProcessNode):
     outputs = ("bids_img", )
     
-    def _run(self, bids_directory : str, subject : str = None, session : str = None, task : str = None, run : str = None, space : str = None, desc : str = None, suffix : str = None) -> dict:
+    def _run(self, bids_directory : str, subject : str = None, session : str = None, data_type : str = None, task : str = None, run : str = None, space : str = None, desc : str = None, suffix : str = None) -> dict:
         # check if is nifti file
         if _isNiftiFile(desc):
             bids_file = desc
         else:
             # if not, assume it is a description
             bids_file = _checkBIDSQuery(suffix, 
-                         _getBIDSFiles(
+                         *_getBIDSFiles(
                             bids_directory, 
                                 subject=subject, 
                                     session=session, 
-                                        task=task, 
-                                            run=run, 
-                                                space=space, 
-                                                    desc=desc,
-                                                        suffix=suffix, 
-                                                            extension=".nii*"))
+                                        data_type=data_type,
+                                            task=task, 
+                                                run=run, 
+                                                    space=space, 
+                                                        desc=desc,
+                                                            suffix=suffix, 
+                                                                extension=".nii*"))
         # load in bids data
         bids_img = image.load_img(bids_file)
         
@@ -185,7 +186,7 @@ class LoadTimeseriesEvent(ProcessNode):
             try:
                 events_df = pd.read_csv(
                                     _checkBIDSQuery("events", 
-                                        _getBIDSFiles(
+                                        *_getBIDSFiles(
                                             bids_directory, 
                                                 subject=subject, 
                                                     session=session, 
@@ -234,7 +235,7 @@ class LoadDopplerData(ProcessNode):
         # load doppler data
         doppler_ts = pd.read_csv(
                         _checkBIDSQuery("Doppler", 
-                            _getBIDSFiles(
+                            *_getBIDSFiles(
                                         bids_directory,
                                             subject=subject, 
                                                 session=session, 
@@ -288,7 +289,7 @@ class LoadDopplerData(ProcessNode):
             try:
                 events_df = pd.read_csv(
                                     _checkBIDSQuery("events", 
-                                        _getBIDSFiles(
+                                        *_getBIDSFiles(
                                             bids_directory, 
                                                 subject=subject, 
                                                     session=session, 
@@ -313,8 +314,8 @@ class LoadPhysioData(ProcessNode):
     outputs = ("times", "timeseries", "time_step", "units", "variables")
     def _run(self, bids_directory : str, subject : str = None, session : str = None, data_type : str = None, task : str = None, acq : str = None, run : str = None, recording : str = None, variables : list = None) -> dict:
         # load json
-        physio_json_name =  _checkBIDSQuery("Physio", 
-                            _getBIDSFiles(
+        physio_json_name =  _checkBIDSQuery("PhysioJson", 
+                            *_getBIDSFiles(
                                         bids_directory,
                                             subject=subject, 
                                                 session=session, 
@@ -334,8 +335,8 @@ class LoadPhysioData(ProcessNode):
 
         # load in physio ts
         physio_ts = np.loadtxt(
-                        _checkBIDSQuery("Physio", 
-                            _getBIDSFiles(
+                        _checkBIDSQuery("PhysioData", 
+                            *_getBIDSFiles(
                                         bids_directory,
                                             subject=subject, 
                                                 session=session, 

@@ -370,7 +370,7 @@ class FilterTimeshifts(ProcessNode):
         # convert back to array
         filtered_timesshift_data = timeseries_masker.transform(
             image.new_img_like(new_timeshift_maxcorr_img, filtered_timeshift_3d_data)
-        )[0]
+        )
         # change back smoothing 
         timeseries_masker.smoothing_fwhm = old_smooth_fwhm
         # get values to mask
@@ -458,6 +458,9 @@ class RegressCVR(ProcessNode):
             # return all nans
             return 0, np.full(design_matrix.shape[1], np.nan), np.full_like(dv_ts, np.nan), np.nan, np.nan, np.nan, np.nan, design_matrix, np.nan, np.nan
         non_nan_dm = design_matrix[~nan_entries]
+        # remove all zero columns (for example spike regressor with spike outside of aligned regressor)
+        non_zero_mask = (non_nan_dm != 0).any(axis=0)
+        non_nan_dm = non_nan_dm.loc[:, non_zero_mask]; design_matrix = design_matrix.loc[:, non_zero_mask] 
         non_nan_bs = dv_ts[~nan_entries]
         # threshold confunds
         if confound_regressor_correlation_threshold is not None and not confounds_df.empty and not regressor_timeseries.empty:

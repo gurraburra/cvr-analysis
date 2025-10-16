@@ -7,9 +7,11 @@ import sys
 import json
 from scipy.ndimage import affine_transform
 from itertools import product
+from matplotlib.colors import LinearSegmentedColormap, Normalize, TwoSlopeNorm
+from matplotlib.cm import get_cmap
 
 class IMGShow:
-    def __init__(self, img, voxel_mask, settings, data_transform, *plot_data):
+    def __init__(self, img, voxel_mask, bg_img, settings, data_transform, *plot_data):
         # initate figure
         self.fig, self.axes = plt.subplots(2,2, figsize=(7,7))
         self.fig.tight_layout()
@@ -21,6 +23,7 @@ class IMGShow:
         self.plot_ax = self.axes[1,1]
         # store data
         self.img = img
+        self.bg_img = bg_img
         self.voxel_mask = voxel_mask
         self.settings = settings
         self.data_transform = data_transform
@@ -28,20 +31,28 @@ class IMGShow:
         # connect mpl
         self.fig.canvas.mpl_connect("button_press_event", self.buttonClick)
         # colormap
-        self.settings["norm"] = mpl.colors.TwoSlopeNorm(vcenter = self.settings["vcenter"], vmin = self.settings["vmin"], vmax = self.settings["vmax"])
+        cmap, norm = self.makeCmap(self.settings["cmap"], self.settings["vcenter"], self.settings["vmin"], self.settings["vmax"], self.settings["threshold"])
+        # self.settings["norm"] = mpl.colors.TwoSlopeNorm(vcenter = self.settings["vcenter"], vmin = self.settings["vmin"], vmax = self.settings["vmax"])
         del self.settings["vcenter"]
         del self.settings["vmin"]
         del self.settings["vmax"]
+        del self.settings["threshold"]
+        self.settings["norm"] = norm
+        self.settings["cmap"] = cmap
         self.scal_map = mpl.cm.ScalarMappable(norm=self.settings["norm"], cmap=self.settings["cmap"])
         # self.fig.set_facecolor("black")
         self.createColorbar()
         # set default position
-        self.pos = [20,30,20]
+        self.pos = ((np.array(img.shape) - 1) / 2).astype(int).tolist()
         self.update()
 
     def update(self):
         for ax in self.axes.ravel():
             ax.cla()
+        if self.bg_img is not None:
+            self.sagittal_ax.imshow(self.bg_img[self.pos[0],:,:].T, cmap = "gray")
+            self.coronal_ax.imshow(self.bg_img[:,self.pos[1],:].T, cmap = "gray")
+            self.axial_ax.imshow(self.bg_img[:,:,self.pos[2]].T, cmap = "gray")
         # sagittal
         self.sagittal_ax.imshow(self.img[self.pos[0],:,:].T, **self.settings)
         self.sagittal_ax.axvline(self.pos[1], color = "black", alpha = 0.5)
@@ -61,9 +72,10 @@ class IMGShow:
             self.axial_ax.imshow(self.voxel_mask[:,:,self.pos[2]].T, cmap = 'Greys', aspect = self.settings["aspect"], origin = self.settings["origin"], interpolation = 'nearest')
         # plot ax
         pos = self.pos.copy()
-        pos.append(1)
-        pos = np.array(pos)[:,None]
-        pos = np.round(np.linalg.matmul(self.data_transform, pos), 0).astype(int)[:3,0]
+        if self.data_transform is not None:
+            pos.append(1)
+            pos = np.array(pos)[:,None]
+            pos = np.round(np.linalg.matmul(self.data_transform, pos), 0).astype(int)[:3,0]          
         for data, label in self.plot_data:
             if isinstance(data, tuple):
                 times, data = data
@@ -86,7 +98,13 @@ class IMGShow:
                     self.plot_ax.plot(times, data[pos[0], pos[1], pos[2]], label = label)
             else:
                 raise ValueError("Incorrect dimensions")
-        self.plot_ax.legend(loc = "lower left", title = f"pos: ({pos[0]},{pos[1]},{pos[1]}), val: {self.img[self.pos[0],self.pos[1],self.pos[2]]:.2f}")
+        if self.plot_ax.lines:
+            val = self.img[self.pos[0],self.pos[1],self.pos[2]]
+            if np.ma.is_masked(val):
+                val_str = "--"
+            else:
+                val_str = f"{val:.2f}"
+            self.plot_ax.legend(loc = "lower left", title = f"pos: ({pos[0]},{pos[1]},{pos[1]}), val: {val_str}")
         # self.plot_ax.set_aspect('equal')
 
         self.setAxis()
@@ -128,6 +146,37 @@ class IMGShow:
         cbar_ax = self.fig.add_axes([0.86, 0.2, 0.05, 0.6])
         cbar_ax.yaxis.set_tick_params(color="black", labelcolor="black")
         self.fig.colorbar(self.scal_map, cax=cbar_ax)
+
+
+    def makeCmap(self, base_cmap='coolwarm', vcenter=0, vmin=-5, vmax=5, threshold=1.0):
+        if vmin is None:
+            vmin = -vmax
+        if threshold is not None:
+            # Ensure symmetry
+            assert vmin is None or vmin == -vmax, "when threshold given vmin needs to be negative of vmax"
+            assert vcenter is None or vcenter == 0, "when threshold given vcenter needs to be 0"
+            vmax = abs(vmax)
+            vmin = -vmax
+            vcenter = 0
+            # Sample base cmap
+            n = 256
+            base = get_cmap(base_cmap)
+            colors = base(np.linspace(0, 1, n))
+            # Compute normalized threshold position (0–1 scale)
+            norm = TwoSlopeNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
+            thr_rel = norm(abs(threshold)) # normalized threshold value in [0,1]
+            thr_rel = np.clip(thr_rel, 0, 1)
+            # Convert to index in [0, n-1]
+            mid_idx = n // 2
+            thr_idx = int(thr_rel * n - mid_idx)
+            # Set alpha = 0 in |x| < threshold
+            colors[mid_idx - thr_idx : mid_idx + thr_idx, -1] = 0.0
+            cmap = LinearSegmentedColormap.from_list(f"{base.name}_transparent", colors, N=n)
+            return cmap, norm
+        else:
+            if vcenter is None:
+                vcenter = (vmax + vmin) / 2
+            return base_cmap, TwoSlopeNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
         
 
 def stand(sig):
@@ -138,57 +187,56 @@ def maxMinNorm(sig):
 
 norm_funcs = {"stand" : stand, "maxMin" : maxMinNorm, None : lambda x : x}
 
-def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_transform = None, norm : str = "maxMin", data_include = "bold+regressor+predictions", non_zero_mask = False, radiological = True, **custom_settings):
+def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', bg_img = None, cvr_transform = None, norm_data : str = "maxMin", data_include = "bold+regressor+predictions", voxel_mask = False, radiological = True, **custom_settings):
     # settings
-    settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "aspect" : "equal", "origin" : "lower", 'interpolation' : 'antialiased'}
+    settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "threshold" : None, "aspect" : "equal", "origin" : "lower", 'interpolation' : 'antialiased'}
     settings.update(custom_settings)
     # norm_func
-    norm_func = norm_funcs[norm]
+    norm_func = norm_funcs[norm_data]
     # folder preamble
     folder, analys_file = os.path.split(analysis_file)
     preamble = analys_file.split("_desc-analys_info")[0]
-    # cvr file
+    # cvr img
     cvr_img = image.load_img(os.path.join(folder, preamble + f"_desc-{img_desc}_map.nii.gz"))
-    # resample image to display correctly
-    # store all corner points
-    points = []
-    for x,y,z in product(*[[0,s-1] for s in cvr_img.shape]):
-        points.append((x,y,z,1))
-    points = np.array(points).T
-    # transform using affine transform
-    affine_points = np.linalg.matmul(cvr_img.affine, points)
-    # find max and min
-    min_loc = np.min(affine_points, axis = 1)[:3] 
-    max_loc = np.max(affine_points, axis = 1)[:3]
-    # find the voxel with smallest scale
-    scale = np.abs(cvr_img.affine.diagonal()[:3]).min()
-    # create new affine matrix
-    affine = np.eye(4)
-    affine[[0,1,2], [0,1,2]] = scale
-    # set least value to min location
-    affine[:3,3] = min_loc
+    # sotr inverse tranform going from real space to cvr space
+    data_transform = np.linalg.inv(cvr_img.affine)
+    if bg_img is not None:
+        # resample CVR
+        cvr_img = image.resample_to_img(cvr_img, bg_img, "nearest", force_resample=True, copy_header=True)
+    # resample image to uniform scale using get_zooms
+    new_affine = cvr_img.affine @ np.diag(1 / np.array(cvr_img.header.get_zooms() + (1,)))
+    new_shape = (np.array(cvr_img.shape) * np.array(cvr_img.header.get_zooms())).astype(int)
     # radiological
     if radiological:
-        affine[0,3] = max_loc[0]
-        affine[0,0] = -affine[0,0]
-    # make sure out shape cover whole field of view
-    out_shape = np.ceil((max_loc - min_loc) / scale).astype(int)
-    # create data transform matrix
-    data_transform = np.linalg.matmul(np.linalg.inv(cvr_img.affine), affine)
-    # resample cvr img
-    cvr_img = image.resample_img(cvr_img, affine, out_shape, force_resample=True, copy_header=True)
+        mirror_x = np.diag([-1,1,1,1])
+        mirror_x[0,3] = (cvr_img.shape[0] - 1)
+        new_affine @= mirror_x
+    cvr_img = image.resample_img(cvr_img, new_affine, new_shape, "nearest", force_resample=True, copy_header=True)
+    if bg_img is not None:
+        bg_img = image.resample_img(bg_img, new_affine, new_shape, "nearest", force_resample=True, copy_header=True)
+        bg_data = bg_img.get_fdata()
+    else:
+        bg_data = None
+
+    # update data transform
+    data_transform @= new_affine
+
+    # data_transform @= cvr_img.affine
+    
+    # cvr file
+    # cvr_img = transformIMG(cvr_img)
     # cvr data
     cvr_data = cvr_img.get_fdata()
     # mask
     # cvr_mask = np.abs(cvr_data) < 1e-10
     # mask data
-    cvr_img_masked = cvr_data #  np.ma.masked_where(cvr_mask, cvr_data)
+    cvr_data = cvr_data #  np.ma.masked_where(cvr_mask, cvr_data)
     if cvr_transform is not None:
-        cvr_img_masked = cvr_transform(cvr_img_masked)
+        cvr_data = cvr_transform(cvr_data)
     # data
     data = []
     # spit data include
-    data_include = data_include.split("+")
+    data_include = data_include.replace(" ","").split("+")
     # get timeshift data
     if "timeshift" in data_include:
         try:
@@ -199,8 +247,8 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
     # get bold data
     if "postproc" in data_include:
         try:
-            bold_img = image.load_img(os.path.join(folder, preamble + "_desc-postproc_bold.nii.gz"))
-            data.append((norm_func(bold_img.get_fdata()), "bold"))
+            postproc_img = image.load_img(os.path.join(folder, preamble + "_desc-postproc_bold.nii.gz"))
+            data.append((norm_func(postproc_img.get_fdata()), "bold"))
         except:
             print("No postproc img found")
     # get aligned regressor data
@@ -230,20 +278,25 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', cvr_tr
             print("No correlation img found")
     # get voxel mask
     try:
-        if non_zero_mask:
-            voxel_mask_img = image.math_img("~np.isclose(img,0)", img = cvr_img)
-        else:
-            with open(os.path.join(folder, preamble + "_desc-data_info.json"), "r") as file:
-                data_info = json.load(file)
-            voxel_mask_img = image.resample_to_img(data_info['voxel-mask-file'], cvr_img, force_resample=True, interpolation="nearest", copy_header=True)
-        voxel_mask = np.ma.masked_where(voxel_mask_img.get_fdata(), voxel_mask_img.get_fdata())
-        # voxel_mask = None
+        if voxel_mask is not None:
+            if voxel_mask == "non-zero":
+                cvr_data = np.ma.masked_where(cvr_data == 0, cvr_data)
+                # voxel_mask_img = (image.math_img("~np.isclose(img,0)", img = cvr_img))
+            elif voxel_mask == "load":
+                with open(os.path.join(folder, preamble + "_desc-data_info.json"), "r") as file:
+                    data_info = json.load(file)
+                voxel_mask_img = image.resample_to_img(data_info['voxel-mask-file'], cvr_img, force_resample=True, interpolation="nearest", copy_header=True)
+                cvr_data = np.ma.masked_where(voxel_mask_img.get_fdata() == 0, cvr_data)
+            # voxel_mask_data = voxel_mask_img.get_fdata()
+            # voxel_mask = np.ma.masked_where(voxel_mask_data != 0, voxel_mask_data)
+            # cvr_data = np.ma.masked_where(voxel_mask_data == 0, cvr_data)
+        # else:
+        #     voxel_mask = None
     except:
-        voxel_mask = None
+        # voxel_mask = None
         print("Could not load voxel mask")
 
-    img_show = IMGShow(cvr_img_masked, voxel_mask, settings, data_transform, 
-                        *data)
+    img_show = IMGShow(cvr_data, None, bg_data, settings, data_transform, *data)
     
     img_show.fig.suptitle(preamble)
 
