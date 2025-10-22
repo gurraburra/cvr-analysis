@@ -172,21 +172,21 @@ def saveData(
                 raise ValueError(f"Following data is not available: {non_available_data}")
             # 2D data
             if "postproc" in data_save_list:
-                postfix = "desc-postproc_doppler"
-                saveTimeseriesInfo(preamble + postfix + ".json", 0, up_sampled_sample_time)
-                pd.DataFrame(doppler_postproc_timeseries.T, columns=doppler_variables).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                fname = preamble + "desc-postproc_doppler"
+                saveTimeseriesInfo(fname + ".json", 0, up_sampled_sample_time)
+                pd.DataFrame(doppler_postproc_timeseries.T, columns=doppler_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             if "predictions" in data_save_list:
-                postfix = "desc-predictions_doppler"
-                saveTimeseriesInfo(preamble + postfix + ".json", 0, regression_sample_time)
-                pd.DataFrame(doppler_predictions.T, columns=doppler_variables).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                fname = preamble + "desc-predictions_doppler"
+                saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
+                pd.DataFrame(doppler_predictions.T, columns=doppler_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             if "alignedregressor":
-                postfix = "desc-alignedRegressor_timeseries"
-                saveTimeseriesInfo(preamble + postfix + ".json", 0, regression_sample_time)
-                pd.DataFrame(doppler_aligned_regressor_timeseries.T, columns=doppler_variables).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                fname = preamble + "desc-alignedRegressor_timeseries"
+                saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
+                pd.DataFrame(doppler_aligned_regressor_timeseries.T, columns=doppler_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             if "xcorrelations" in data_save_list:
-                postfix = "desc-xCorrelations_timeseries"
-                saveTimeseriesInfo(preamble + postfix + ".json", doppler_timeshifts[0,0], regression_sample_time)
-                pd.DataFrame(doppler_correlations.T, columns=doppler_variables).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                fname = preamble + "desc-xCorrelations_timeseries"
+                saveTimeseriesInfo(fname + ".json", doppler_timeshifts[0,0], regression_sample_time)
+                pd.DataFrame(doppler_correlations.T, columns=doppler_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             # dataframe data
             df_dict = {
                 "signal" : doppler_variables,
@@ -209,34 +209,34 @@ def saveData(
             # 1D data
             if "initialglobalalignedregressorseries" in data_save_list:
                 # global regressor
-                postfix = "desc-initialGlobalAlignedRegressorSeries_timeseries"
-                saveTimeseriesInfo(preamble + postfix + ".json", 0, up_sampled_sample_time)
-                pd.DataFrame(np.vstack((global_postproc_timeseries, initial_global_aligned_regressor_timeseries)).T, columns=["global_series", "aligned_regressor_series"]).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, compression="gzip")
+                fname = preamble + "desc-initialGlobalAlignedRegressorSeries_timeseries"
+                saveTimeseriesInfo(fname + ".json", 0, up_sampled_sample_time)
+                pd.DataFrame(np.vstack((global_postproc_timeseries, initial_global_aligned_regressor_timeseries)).T, columns=["global_series", "aligned_regressor_series"]).to_csv(fname + ".tsv.gz", sep="\t", index = False, compression="gzip")
             if "globalregressorfit" in data_save_list:
                 # global regressor
-                postfix = "desc-globalRegressorFit_timeseries"
-                saveTimeseriesInfo(preamble + postfix + ".json", 0, regression_sample_time)
-                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "predictions"]).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, compression="gzip")
+                fname = preamble + "desc-globalRegressorFit_timeseries"
+                saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
+                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "predictions"]).to_csv(fname + ".tsv.gz", sep="\t", index = False, compression="gzip")
             if "globalregressorxcorrelation" in data_save_list: 
                 # global regressor correlations
-                postfix = "desc-globalRegressorrXCorrelation_timeseries"
-                saveTimeseriesInfo(preamble + postfix + ".json", global_regressor_timeshifts[0], up_sampled_sample_time)
-                pd.Series(global_regressor_correlations).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header=False, compression="gzip")
+                fname = preamble + "desc-globalRegressorrXCorrelation_timeseries"
+                saveTimeseriesInfo(fname + ".json", global_regressor_timeshifts[0], up_sampled_sample_time)
+                pd.Series(global_regressor_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header=False, compression="gzip")
             if "regressorautocorrelation" in data_save_list: 
                 # regressor autocorrelation
-                postfix = "desc-regressorAutocorrelation_timeseries"
-                saveTimeseriesInfo(preamble + postfix + ".json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(regressor_autocorrelation_correlations).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+                fname = preamble + "desc-regressorAutocorrelation_timeseries"
+                saveTimeseriesInfo(fname + ".json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
+                pd.Series(regressor_autocorrelation_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
             if "globalautocorrelation" in data_save_list:
                 # global autocorrelation
-                postfix = "desc-globalAutocorrelation_timeseries"
-                saveTimeseriesInfo(preamble + postfix + ".json", global_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(global_autocorrelation_correlations).to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+                fname = preamble + "desc-globalAutocorrelation_timeseries"
+                saveTimeseriesInfo(fname + ".json", global_autocorrelation_timeshifts[0], up_sampled_sample_time)
+                pd.Series(global_autocorrelation_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
             if "confounds" in data_save_list and regression_confounds_df is not None:
                 # confounds
-                postfix = "desc-confounds_timeseries"
-                saveTimeseriesInfo(preamble + postfix + ".json", 0, regression_sample_time)
-                regression_confounds_df.to_csv(preamble + postfix + ".tsv.gz", sep="\t", index = False, compression="gzip")
+                fname = preamble + "desc-confounds_timeseries"
+                saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
+                regression_confounds_df.to_csv(fname + ".tsv.gz", sep="\t", index = False, compression="gzip")
             # 1D data
             if regression_confounds_df is not None:
                 confounds_names = list(regression_confounds_df.columns)

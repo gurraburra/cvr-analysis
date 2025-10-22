@@ -223,21 +223,21 @@ def saveData(
             # save data
             # 4D data
             if "postproc" in data_save_list:
-                desc = "postproc"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, up_sampled_sample_time)
-                dataToImage(timeseries_masker, bold_postproc_timeseries.T).to_filename(preamble + f"desc-{desc}_bold.nii.gz")
+                fname = preamble + "desc-postproc_bold"
+                saveTimeseriesInfo(fname + ".json", 0, up_sampled_sample_time)
+                dataToImage(timeseries_masker, bold_postproc_timeseries.T).to_filename(fname + ".nii.gz")
             if "xcorrelation" in data_save_list:
-                desc = "xCorrelations"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", bold_timeshifts[0,0], up_sampled_sample_time)
-                dataToImage(timeseries_masker, bold_correlations.T).to_filename(preamble + f"desc-{desc}_timeseries.nii.gz")
+                fname = preamble + "desc-xCorrelations_timeseries"
+                saveTimeseriesInfo(fname + ".json", bold_timeshifts[0,0], up_sampled_sample_time)
+                dataToImage(timeseries_masker, bold_correlations.T).to_filename(fname + ".nii.gz")
             if "alignedregressor" in data_save_list:
-                desc = "alignedRegressor"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, regression_sample_time)
-                dataToImage(timeseries_masker, bold_aligned_regressor_timeseries.T).to_filename(preamble + f"desc-{desc}_timeseries.nii.gz")
+                fname = preamble + "desc-alignedRegressor_timeseries"
+                saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
+                dataToImage(timeseries_masker, bold_aligned_regressor_timeseries.T).to_filename(fname + ".nii.gz")
             if "predictions" in data_save_list:
-                desc = "predictions"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, regression_sample_time)
-                dataToImage(timeseries_masker, bold_predictions.T).to_filename(preamble + f"desc-{desc}_bold.nii.gz")
+                fname = preamble + "desc-predictions_bold"
+                saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
+                dataToImage(timeseries_masker, bold_predictions.T).to_filename(fname + ".nii.gz")
             # 3D data
             if "cvr" in data_save_list:
                 dataToImage(timeseries_masker, bold_cvr_amplitude).to_filename(preamble + "desc-cvr_map.nii.gz")
@@ -257,36 +257,39 @@ def saveData(
                 dataToImage(timeseries_masker, bold_maxcorr).to_filename(preamble + "desc-maxCorr_map.nii.gz")
             if "dof" in data_save_list:
                 dataToImage(timeseries_masker, bold_dof.astype(np.int32)).to_filename(preamble + "desc-dof_map.nii.gz")
-            if "confounds" in data_save_list and regression_confounds_df is not None:
-                regression_confounds_df.to_csv(preamble + "desc-confounds_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
             if "mask" in data_save_list:
                 voxel_mask_img.to_filename(preamble + "desc-voxel_mask.nii.gz")
             # 1D data
             if "initialglobalalignedregressorseries" in data_save_list:
                 # global regressor
-                desc = "initialGlobalAlignedRegressorSeries"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, up_sampled_sample_time)
-                pd.DataFrame(np.vstack((global_postproc_timeseries, initial_global_aligned_regressor_timeseries)).T, columns=["global_series", "aligned_regressor_series"]).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
+                fname = preamble + "desc-initialGlobalAlignedRegressorSeries_timeseries"
+                saveTimeseriesInfo(fname + ".json", 0, up_sampled_sample_time)
+                pd.DataFrame(np.vstack((global_postproc_timeseries, initial_global_aligned_regressor_timeseries)).T, columns=["global_series", "aligned_regressor_series"]).to_csv(fname + ".tsv.gz", sep="\t", index = False, compression="gzip")
             if "globalregressorfit" in data_save_list:
                 # global regressor
-                desc = "globalRegressorFit"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", 0, regression_sample_time)
-                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "predictions"]).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, compression="gzip")
+                fname = preamble + "desc-globalRegressorFit_timeseries"
+                saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
+                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "predictions"]).to_csv(fname + ".tsv.gz", sep="\t", index = False, compression="gzip")
             if "globalregressorxcorrelation" in data_save_list: 
                 # global regressor correlations
-                desc = "globalRegressorrXCorrelation"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", global_regressor_timeshifts[0], up_sampled_sample_time)
-                pd.Series(global_regressor_correlations).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, header=False, compression="gzip")
+                fname = preamble + "desc-globalRegressorrXCorrelation_timeseries"
+                saveTimeseriesInfo(fname + ".json", global_regressor_timeshifts[0], up_sampled_sample_time)
+                pd.Series(global_regressor_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header=False, compression="gzip")
             if "regressorautocorrelation" in data_save_list: 
                 # regressor autocorrelation
-                desc = "regressorAutocorrelation"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(regressor_autocorrelation_correlations).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+                fname = preamble + "desc-regressorAutocorrelation_timeseries"
+                saveTimeseriesInfo(fname + ".json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
+                pd.Series(regressor_autocorrelation_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
             if "globalautocorrelation" in data_save_list:
                 # global autocorrelation
-                desc = "globalAutocorrelation"
-                saveTimeseriesInfo(preamble + f"desc-{desc}_timeseries.json", global_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(global_autocorrelation_correlations).to_csv(preamble + f"desc-{desc}_timeseries.tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+                fname = preamble + "desc-globalAutocorrelation_timeseries"
+                saveTimeseriesInfo(fname + ".json", global_autocorrelation_timeshifts[0], up_sampled_sample_time)
+                pd.Series(global_autocorrelation_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
+            if "confounds" in data_save_list and regression_confounds_df is not None:
+                # confounds
+                fname = preamble + "desc-confounds_timeseries"
+                saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
+                regression_confounds_df.to_csv(fname + ".tsv.gz", sep="\t", index = False, compression="gzip")
             # timeseries masker
             if isinstance(timeseries_masker, maskers.NiftiMasker):
                 timeseries_mask_file = timeseries_masker.mask_img_.get_filename()
