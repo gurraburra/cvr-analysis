@@ -151,31 +151,24 @@ class IMGShow:
     def makeCmap(self, base_cmap='coolwarm', vcenter=0, vmin=-5, vmax=5, threshold=1.0):
         if vmin is None:
             vmin = -vmax
+        if vcenter is None:
+            vcenter = (vmax + vmin) / 2
         if threshold is not None:
-            # Ensure symmetry
-            assert vmin is None or vmin == -vmax, "when threshold given vmin needs to be negative of vmax"
-            assert vcenter is None or vcenter == 0, "when threshold given vcenter needs to be 0"
-            vmax = abs(vmax)
-            vmin = -vmax
-            vcenter = 0
             # Sample base cmap
             n = 256
             base = get_cmap(base_cmap)
-            colors = base(np.linspace(0, 1, n))
+            norm_vals = np.linspace(0, 1, n)
+            colors = base(norm_vals)
             # Compute normalized threshold position (0–1 scale)
             norm = TwoSlopeNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
-            thr_rel = norm(abs(threshold)) # normalized threshold value in [0,1]
-            thr_rel = np.clip(thr_rel, 0, 1)
-            # Convert to index in [0, n-1]
-            mid_idx = n // 2
-            thr_idx = int(thr_rel * n - mid_idx)
+            # nfind upper/lower idx
+            upper_tr_idx = np.argmin(np.abs(norm_vals - np.clip(norm(abs(threshold)), 0, 1)))
+            lower_tr_idx = np.argmin(np.abs(norm_vals - np.clip(norm(-abs(threshold)), 0, 1)))
             # Set alpha = 0 in |x| < threshold
-            colors[mid_idx - thr_idx : mid_idx + thr_idx, -1] = 0.0
+            colors[lower_tr_idx : upper_tr_idx + 1, -1] = 0.0
             cmap = LinearSegmentedColormap.from_list(f"{base.name}_transparent", colors, N=n)
             return cmap, norm
         else:
-            if vcenter is None:
-                vcenter = (vmax + vmin) / 2
             return base_cmap, TwoSlopeNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
         
 
