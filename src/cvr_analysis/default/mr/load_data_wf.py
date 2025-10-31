@@ -121,15 +121,15 @@ load_data_wf = ProcessWorkflow(
         (bold_loader.output.tr, generate_bold_times.input.tr),
         (bold_loader.output.nr_measurements, generate_bold_times.input.nr_measurements),
         (generate_bold_times.output.bold_times, ProcessWorkflow.output.bold_times),
-        # regressor wf
-        (ProcessWorkflow.input._, load_regressor_wf.input.all - load_regressor_wf.input[("global_times", "global_timeseries", "global_units", "data_type")]),
-        (ValueNode("BOLD").output.value, (load_regressor_wf.input.global_units, ProcessWorkflow.output.bold_units)),
+        # load regressor wf
+        (ProcessWorkflow.input._, load_regressor_wf.input.all - load_regressor_wf.input[("global_times", "global_timeseries", "global_unit", "data_type")]),
+        (ValueNode("BOLD").output.value, (load_regressor_wf.input.global_unit, ProcessWorkflow.output.bold_unit)),
         (ValueNode("func").output.value, load_regressor_wf.input.data_type),
         (generate_bold_times.output.bold_times, load_regressor_wf.input.global_times),
         (comp_global_signal.output.global_timeseries, load_regressor_wf.input.global_timeseries),
         (load_regressor_wf.output.regressor_times, ProcessWorkflow.output.regressor_times),
         (load_regressor_wf.output.regressor_timeseries, ProcessWorkflow.output.regressor_timeseries),
-        (load_regressor_wf.output.regressor_units, ProcessWorkflow.output.regressor_units),
+        (load_regressor_wf.output.regressor_unit, ProcessWorkflow.output.regressor_unit),
     ),
     description="data loader workflow"
 ).setDefaultInputs(include_motion_confounds = True)

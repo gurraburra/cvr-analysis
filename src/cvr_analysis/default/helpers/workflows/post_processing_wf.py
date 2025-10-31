@@ -3,7 +3,7 @@
 from process_control import *
 # custom packages
 from cvr_analysis.default.helpers.classes.signal_processing import NewSampleTime, ResampleTimeSeries, DetrendTimeSeries, TemporalFilterTimeSeries, TimeLimitTimeSeries
-from cvr_analysis.default.helpers.classes.data_computation import Correlate, AlignTimeSeries
+from cvr_analysis.default.helpers.classes.data_computation import Correlate, AlignTimeSeries, PercentageChangeTimeSeries, StandardizeTimeSeries, BaselineTimeSeries
 
 __all__ = ["post_processing_wf"]
 # %%
@@ -225,7 +225,120 @@ temporal_filter_wf = ProcessWorkflow(
 
 # %%
 
-# signal processing wf
+##############################################
+# convert timeseries it to signals
+##############################################
+
+# get baseline
+# get timeseries signal values
+depvars_baseline = BaselineTimeSeries(description="baseline depvars timeseries")
+global_baseline = BaselineTimeSeries(description="baseline global timeseries")
+# get timeseries signal values
+depvars_percentage = PercentageChangeTimeSeries(description="percentage depvars timeseries")
+global_percentage = PercentageChangeTimeSeries(description="percentage global timeseries")
+confounds_std = StandardizeTimeSeries(description="standardize confounds")
+
+# regressor
+baseline = BaselineTimeSeries(description="baseline regressor timeseries")
+demean_signal_wf = ProcessWorkflow(
+    (
+        (ProcessWorkflow.input.timeseries, baseline.input.timeseries),
+        (ProcessWorkflow.input.baseline_strategy, baseline.input.baseline_strategy),
+        (ProcessWorkflow.input.sample_time, baseline.input.time_step),
+        (ProcessWorkflow.input.unit, ProcessWorkflow.output.signal_unit),
+        (ProcessWorkflow.input.timeseries - baseline.output.baseline, ProcessWorkflow.output.signal_timeseries),
+        (baseline.output.baseline, ProcessWorkflow.output.timeseries_baseline),
+    ),
+    description="create regressor signal"
+)
+psc = PercentageChangeTimeSeries(description="percentage regressor")
+# add % to unit
+def addPercUnit(unit):
+    if unit is None:
+        return None
+    elif isinstance(unit, str):
+        return "%" + unit, 
+    elif isinstance(unit, (tuple,list)):
+        return tuple("%" + u for u in unit),
+    else:
+        raise ValueError("Invalid unit given")
+add_perc_unit = CustomNode(addPercUnit, ("unit", ), description="add percent to unit")
+# wf 
+psc_signal_wf = ProcessWorkflow(
+    (
+        # baseline
+        (ProcessWorkflow.input.timeseries, baseline.input.timeseries),
+        (ProcessWorkflow.input.baseline_strategy, baseline.input.baseline_strategy),
+        (ProcessWorkflow.input.sample_time, baseline.input.time_step),
+        (baseline.output.baseline, ProcessWorkflow.output.timeseries_baseline),
+        # percentage
+        (ProcessWorkflow.input.timeseries, psc.input.timeseries),
+        (baseline.output.baseline, psc.input.baseline),
+        (psc.output.percentage_timeseries, ProcessWorkflow.output.signal_timeseries),
+        # unit
+        (ProcessWorkflow.input.unit, add_perc_unit.input.unit),
+        (add_perc_unit.output.unit, ProcessWorkflow.output.signal_unit),
+    ),
+    description="create regressor signal"
+)
+
+# conditional get signal change
+# dv
+cond_depvars_signal = ConditionalNode("psc_depvars", 
+                                        {False : demean_signal_wf.copy(), True : psc_signal_wf.copy()}, 
+                                        default_condition=True,
+                                        description="conditionally compute dv-vars signal")
+
+cond_global_signal = ConditionalNode("psc_depvars", 
+                                        {False : demean_signal_wf.copy(), True : psc_signal_wf.copy()}, 
+                                        default_condition=True,
+                                        description="conditionally compute global signal")
+# regressor
+cond_regressor_signal = ConditionalNode("psc_regressor", 
+                                        {False : demean_signal_wf.copy(), True : psc_signal_wf.copy()}, 
+                                        default_condition=False,
+                                        description="conditionally compute regressor signal")
+
+
+# %%
+signal_timeseries_wf = ProcessWorkflow(
+    (
+        # depvars signal
+        (ProcessWorkflow.input.psc_depvars, cond_depvars_signal.input.psc_depvars),
+        (ProcessWorkflow.input.sample_time, cond_depvars_signal.input.sample_time),
+        (ProcessWorkflow.input.depvars_timeseries, cond_depvars_signal.input.timeseries),
+        (ProcessWorkflow.input.depvars_unit, cond_depvars_signal.input.unit),
+        (ProcessWorkflow.input.baseline_strategy, cond_depvars_signal.input.baseline_strategy),
+        (cond_depvars_signal.output.timeseries_baseline, ProcessWorkflow.output.depvars_timeseries_baseline),
+        (cond_depvars_signal.output.signal_timeseries, ProcessWorkflow.output.depvars_signal_timeseries),
+        (cond_depvars_signal.output.signal_unit, ProcessWorkflow.output.depvars_signal_unit),
+        # global signal
+        (ProcessWorkflow.input.psc_depvars, cond_global_signal.input.psc_depvars),
+        (ProcessWorkflow.input.sample_time, cond_global_signal.input.sample_time),
+        (ProcessWorkflow.input.global_timeseries, cond_global_signal.input.timeseries),
+        (ProcessWorkflow.input.depvars_unit, cond_global_signal.input.unit),
+        (ProcessWorkflow.input.baseline_strategy, cond_global_signal.input.baseline_strategy),
+        (cond_global_signal.output.timeseries_baseline, ProcessWorkflow.output.global_timeseries_baseline),
+        (cond_global_signal.output.signal_timeseries, ProcessWorkflow.output.global_signal_timeseries),
+        (cond_global_signal.output.signal_unit, ProcessWorkflow.output.global_signal_unit),
+        # regressor signal
+        (ProcessWorkflow.input.psc_regressor, cond_regressor_signal.input.psc_regressor),
+        (ProcessWorkflow.input.sample_time, cond_regressor_signal.input.sample_time),
+        (ProcessWorkflow.input.regressor_timeseries, cond_regressor_signal.input.timeseries),
+        (ProcessWorkflow.input.regressor_unit, cond_regressor_signal.input.unit),
+        (ProcessWorkflow.input.baseline_strategy, cond_regressor_signal.input.baseline_strategy),
+        (cond_regressor_signal.output.timeseries_baseline, ProcessWorkflow.output.regressor_timeseries_baseline),
+        (cond_regressor_signal.output.signal_timeseries, ProcessWorkflow.output.regressor_signal_timeseries),
+        (cond_regressor_signal.output.signal_unit, ProcessWorkflow.output.regressor_signal_unit),
+        # confounds
+        (ProcessWorkflow.input.confounds_df, confounds_std.input.timeseries),
+        (confounds_std.output.standardized_timeseries, ProcessWorkflow.output.confounds_signal_df),
+    ),
+    description="convert timeseries into signals"
+)
+
+# %%
+# post processing wf
 post_processing_wf = ProcessWorkflow(
     (  
         # resample wf
@@ -275,10 +388,22 @@ post_processing_wf = ProcessWorkflow(
         (temporal_filter_wf.output.temporal_filtered_confounds_df, late_time_limit_wf.input.confounds_df),
         (global_regressor_align_wf.output.global_aligned_regressor_timeseries, late_time_limit_wf.input.regressor_timeseries),
         (temporal_filter_wf.output.temporal_filtered_global_timeseries, late_time_limit_wf.input.global_timeseries),
-        (late_time_limit_wf.output.time_limited_depvars_timeseries, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_depvars_timeseries),
-        (late_time_limit_wf.output.time_limited_confounds_df, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_confounds_df),
-        (late_time_limit_wf.output.time_limited_regressor_timeseries, ProcessWorkflow.output.time_limited_global_aligned_temporal_filtered_detrended_up_sampled_regressor_timeseries),
-        (late_time_limit_wf.output.time_limited_global_timeseries, ProcessWorkflow.output.time_limited_temporal_filtered_detrended_up_sampled_global_timeseries),
+        # signal timeseries
+        (ProcessWorkflow.input._, signal_timeseries_wf.input[("baseline_strategy", "psc_depvars", "psc_regressor", "depvars_unit", "regressor_unit")]),
+        (resample_wf.output.new_sample_time, signal_timeseries_wf.input.sample_time),
+        (late_time_limit_wf.output.time_limited_depvars_timeseries, signal_timeseries_wf.input.depvars_timeseries),
+        (late_time_limit_wf.output.time_limited_global_timeseries, signal_timeseries_wf.input.global_timeseries),
+        (late_time_limit_wf.output.time_limited_regressor_timeseries, signal_timeseries_wf.input.regressor_timeseries),
+        (late_time_limit_wf.output.time_limited_confounds_df, signal_timeseries_wf.input.confounds_df),
+        (signal_timeseries_wf.output.depvars_signal_timeseries, ProcessWorkflow.output.depvars_postproc_timeseries),
+        (signal_timeseries_wf.output.depvars_timeseries_baseline, ProcessWorkflow.output.depvars_postproc_baseline),
+        (signal_timeseries_wf.output.confounds_signal_df, ProcessWorkflow.output.confounds_postproc_df),
+        (signal_timeseries_wf.output.regressor_signal_timeseries, ProcessWorkflow.output.regressor_postproc_timeseries),
+        (signal_timeseries_wf.output.regressor_timeseries_baseline, ProcessWorkflow.output.regressor_postproc_baseline),
+        (signal_timeseries_wf.output.global_signal_timeseries, ProcessWorkflow.output.global_postproc_timeseries),
+        (signal_timeseries_wf.output.global_timeseries_baseline, ProcessWorkflow.output.global_postproc_baseline),
+        (signal_timeseries_wf.output.depvars_signal_unit, ProcessWorkflow.output.depvars_postproc_unit),
+        (signal_timeseries_wf.output.regressor_signal_unit, ProcessWorkflow.output.regressor_postproc_unit),
     ),
     description="post-processing wf"
 ).setDefaultInputs(initial_time_limit = False)

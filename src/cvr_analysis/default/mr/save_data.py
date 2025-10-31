@@ -37,8 +37,8 @@ def createHashCheckOverride(
                                                                     do_dtw, dtw_dispersion,
                                                                         force_run = False): 
     # folder for files
+    files_folder = os.path.join(output_directory, f"sub-{subject}", f"ses-{session}", "func")
     analysis_name = "MRT-CVR-version-" + __version__ 
-    files_folder = os.path.join(output_directory, f"sub-{subject}", f"ses-{session}", analysis_name)
 
     # convert None
     def try_conv(val, type_):
@@ -124,7 +124,7 @@ def createHashCheckOverride(
         "refine-regressor-nr-recursions"            : try_conv(refine_regressor_nr_recursions, int),
         "refine-regressor-correlation-threshold"    : try_conv(refine_regressor_correlation_threshold, float),
         "refine-regressor-explained-variance"       : try_conv(refine_regressor_explained_variance, float),
-        "dtw-to-ensure-regressor-units"             : bool(do_dtw),
+        "dtw-to-ensure-regressor-unit"             : bool(do_dtw),
         "dtw-dispersion"                            : try_conv(dtw_dispersion, float),
         "include-motion-confounds"                  : bool(include_motion_confounds),
         "include-drift-confounds"                   : bool(include_drift_confounds),
@@ -167,12 +167,12 @@ def saveData(
                 subject, session, task, run, space,
                     # post-processing data
                     voxel_mask_img, timeseries_masker, bold_tr,
-                        up_sampling_factor, up_sampled_sample_time, regressor_units, 
+                        up_sampling_factor, up_sampled_sample_time, regressor_unit, regressor_baseline,
                             # initial global alignement
-                            initial_global_regressor_alignment, initial_global_aligned_regressor_timeseries, global_postproc_timeseries,
+                            initial_global_regressor_alignment, initial_global_aligned_regressor_timeseries, global_postproc_timeseries, global_baseline,
                                 # global regressor signal fit
                                 global_regressor_beta, global_regressor_timeshift_maxcorr, global_regressor_maxcorr, global_regressor_timeshifts, global_regressor_correlations, 
-                                    global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions,
+                                    down_sampled_global_postproc_timeseries, down_sampled_global_aligned_regressor_timeseries, down_sampled_global_regressor_predictions,
                                         # global regressor data
                                         regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
                                             global_rms, global_autocorrelation_timeshifts, global_autocorrelation_correlations, 
@@ -182,7 +182,7 @@ def saveData(
                                                         bold_aligned_regressor_timeseries,
                                                             # bold regression data
                                                             bold_dof, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_standard_error, bold_t_value,
-                                                                bold_cvr_amplitude, bold_p_value, regression_sample_time, bold_units,
+                                                                bold_cvr_amplitude, bold_p_value, regression_sample_time, bold_unit, bold_baseline,
                                                                 # confounds
                                                                 regression_confounds_df,
                                                                     # data to save
@@ -259,6 +259,8 @@ def saveData(
                 dataToImage(timeseries_masker, bold_dof.astype(np.int32)).to_filename(preamble + "desc-dof_map.nii.gz")
             if "mask" in data_save_list:
                 voxel_mask_img.to_filename(preamble + "desc-voxel_mask.nii.gz")
+            if "baseline" in data_save_list:
+                dataToImage(timeseries_masker, bold_baseline.astype(np.int32)).to_filename(preamble + "desc-baseline_map.nii.gz")
             # 1D data
             if "initialglobalalignedregressorseries" in data_save_list:
                 # global regressor
@@ -269,7 +271,7 @@ def saveData(
                 # global regressor
                 fname = preamble + "desc-globalRegressorFit_timeseries"
                 saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
-                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "predictions"]).to_csv(fname + ".tsv.gz", sep="\t", index = False, compression="gzip")
+                pd.DataFrame(np.vstack((down_sampled_global_postproc_timeseries, down_sampled_global_aligned_regressor_timeseries, down_sampled_global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "predictions"]).to_csv(fname + ".tsv.gz", sep="\t", index = False, compression="gzip")
             if "globalregressorxcorrelation" in data_save_list: 
                 # global regressor correlations
                 fname = preamble + "desc-globalRegressorrXCorrelation_timeseries"
@@ -317,14 +319,16 @@ def saveData(
                         "voxel-mask-file"                       : voxel_mask_img.get_filename(),
                         "timeseries-masker-file"                : timeseries_mask_file,
                         # global regressor data
-                        "regressor-units"                       : regressor_units,
-                        "bold-units"                            : bold_units,
+                        "regressor-unit"                        : regressor_unit,
+                        "regressor-intial-baseline"             : regressor_baseline,
+                        "bold-unit"                             : bold_unit,
                         "initial-global-regressor-alignment"    : initial_global_regressor_alignment,
                         "global-regressor-timeshift-maxcorr"    : global_regressor_timeshift_maxcorr,
                         "global-regressor-maxcorr"              : global_regressor_maxcorr,
                         "global-regressor-beta"                 : global_regressor_beta,
                         "regressor-rms"                         : regressor_rms,
                         "global-rms"                            : global_rms,
+                        "global-initial-baseline"               : global_baseline,
                         # bold alignment data
                         "reference-regressor-timeshift"         : reference_regressor_timeshift, 
                         "align-regressor-absolute-bounds"       : (align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound),

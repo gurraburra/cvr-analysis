@@ -47,7 +47,8 @@ physio_wf = ProcessWorkflow(
         (ProcessWorkflow.input._, physio_loader.input.all - physio_loader.input[("recording", "variables")]),
         (physio_name_split.output.recording, physio_loader.input.recording),
         (single_phys_var.output.variable, physio_loader.input.variables),
-        (physio_loader.output.all, ProcessWorkflow.output._)
+        (physio_loader.output.all / physio_loader.output.units, ProcessWorkflow.output._),
+        (physio_loader.output.units, ProcessWorkflow.output.unit)
     ), description="load physio data"
 )
 event_loader = LoadTimeseriesEvent()
@@ -57,7 +58,7 @@ pass_global_regressor = ProcessWorkflow(
     (
         (ProcessWorkflow.input.global_times, ProcessWorkflow.output.regressor_times),
         (ProcessWorkflow.input.global_timeseries, ProcessWorkflow.output.regressor_timeseries),
-        (ProcessWorkflow.input.global_units, ProcessWorkflow.output.regressor_units),
+        (ProcessWorkflow.input.global_unit, ProcessWorkflow.output.regressor_unit),
     )
 )
 #%%
@@ -74,7 +75,7 @@ conditional_loader = ConditionalNode("regressor_type",
                                    {
                                        "regressor_times" : (event_loader.output.times,physio_wf.output.times),
                                        "regressor_timeseries" : (event_loader.output.timeseries,physio_wf.output.timeseries), 
-                                       "regressor_units" : (event_loader.output.unit,physio_wf.output.units) 
+                                       "regressor_unit" : (event_loader.output.unit,physio_wf.output.unit) 
                                    },
                                    description="conditionally load regressor data").setDefaultInputs(regressor = ProcessNode.no_default_input)
 
@@ -95,7 +96,7 @@ def convFactorUnit(timeseries, unit, use_mmhg = True):
             return timeseries, unit
     else:
         return None, None
-conv_factor = CustomNode(convFactorUnit, outputs=("conv_timeseries", "conv_units"))
+conv_factor = CustomNode(convFactorUnit, outputs=("conv_timeseries", "conv_unit"))
 
 # load regressor wf
 load_regressor_wf = ProcessWorkflow(
@@ -110,8 +111,9 @@ load_regressor_wf = ProcessWorkflow(
         # convert unit
         (ProcessWorkflow.input._, conv_factor.input.use_mmhg),
         (conditional_loader.output.regressor_timeseries, conv_factor.input.timeseries),
-        (conditional_loader.output.regressor_units, conv_factor.input.unit),
+        (conditional_loader.output.regressor_unit, conv_factor.input.unit),
         (conv_factor.output.conv_timeseries, ProcessWorkflow.output.regressor_timeseries),
-        (conv_factor.output.conv_units, ProcessWorkflow.output.regressor_units),
+        (conv_factor.output.conv_unit, ProcessWorkflow.output.regressor_unit),
     ), description="regressor wf"
 )
+# %%

@@ -9,12 +9,62 @@ from scipy.ndimage import affine_transform
 from itertools import product
 from matplotlib.colors import LinearSegmentedColormap, Normalize, TwoSlopeNorm
 from matplotlib.cm import get_cmap
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+import numpy as np
+
+def make_2x2_with_colorbar(ax=None, cbar_width=0.05, cbar_pad=0.02):
+    """
+    Create (or insert) a 2x2 grid of subplots with a single colorbar axis
+    spanning both rows on the right.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes or None
+        If None -> creates a new Figure with layout.
+        If given -> replaces that axis with this layout in the same position.
+    cbar_width : float
+        Relative width of colorbar area.
+    cbar_pad : float
+        Padding between the main plots and colorbar.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+    axs : 2D numpy array of Axes (shape [2,2])
+    cax : Axes for colorbar
+    """
+
+    if ax is None:
+        # Make a new figure with overall gridspec
+        fig = plt.figure(figsize=(8, 6))
+        outer_gs = GridSpec(1, 1, figure=fig)
+        sub_gs = outer_gs[0].subgridspec(2, 3, width_ratios=[1, 1, cbar_width],
+                                         wspace=cbar_pad)
+    else:
+        # Replace the given axis with this layout
+        fig = ax.figure
+        parent_spec = ax.get_subplotspec()
+        sub_gs = GridSpecFromSubplotSpec(2, 3, subplot_spec=parent_spec,
+                                         width_ratios=[1, 1, cbar_width],
+                                         wspace=cbar_pad)
+        ax.remove()
+
+    # Create the 2x2 main axes
+    axs = np.empty((2, 2), dtype=object)
+    for i in range(2):
+        for j in range(2):
+            axs[i, j] = fig.add_subplot(sub_gs[i, j])
+
+    # Create the colorbar axis spanning both rows
+    cax = fig.add_subplot(sub_gs[:, 2])
+
+    return fig, axs, cax
 
 class IMGShow:
-    def __init__(self, img, voxel_mask, bg_img, settings, data_transform, *plot_data):
+    def __init__(self, img, voxel_mask, bg_img, settings, data_transform, *plot_data, ax = None):
         # initate figure
-        self.fig, self.axes = plt.subplots(2,2, figsize=(7,7))
-        self.fig.tight_layout()
+        self.fig, self.axes, self.cbar_ax = make_2x2_with_colorbar(ax)#plt.subplots(2,2, )
+        # self.fig.tight_layout()
         self.fig.subplots_adjust(wspace=0, hspace=0, left=0, right=0.8, bottom=0.1, top=0.9)
         # set axis
         self.sagittal_ax = self.axes[0,0]
@@ -44,6 +94,9 @@ class IMGShow:
         self.createColorbar()
         # set default position
         self.pos = ((np.array(img.shape) - 1) / 2).astype(int).tolist()
+        # self linked imgs
+        self.linked_imgs = []
+        # update
         self.update()
 
     def update(self):
@@ -104,7 +157,7 @@ class IMGShow:
                 val_str = "--"
             else:
                 val_str = f"{val:.2f}"
-            self.plot_ax.legend(loc = "lower left", title = f"pos: ({pos[0]},{pos[1]},{pos[1]}), val: {val_str}")
+            self.plot_ax.legend(loc = "lower left", title = f"pos: ({pos[0]},{pos[1]},{pos[2]}), val: {val_str}")
         # self.plot_ax.set_aspect('equal')
 
         self.setAxis()
@@ -132,20 +185,30 @@ class IMGShow:
             if event.inaxes == self.axial_ax:
                 self.pos[0] = x
                 self.pos[1] = y
+                for l in self.linked_imgs:
+                    l.pos[0] = x
+                    l.pos[1] = y
             elif event.inaxes == self.coronal_ax:
                 self.pos[0] = x
                 self.pos[2] = y
+                for l in self.linked_imgs:
+                    l.pos[0] = x
+                    l.pos[2] = y
             elif event.inaxes == self.sagittal_ax:
                 self.pos[1] = x
                 self.pos[2] = y
+                for l in self.linked_imgs:
+                    l.pos[1] = x
+                    l.pos[2] = y
             self.update()
+            for l in self.linked_imgs:
+                l.update()
         except:
             pass
 
     def createColorbar(self):
-        cbar_ax = self.fig.add_axes([0.86, 0.2, 0.05, 0.6])
-        cbar_ax.yaxis.set_tick_params(color="black", labelcolor="black")
-        self.fig.colorbar(self.scal_map, cax=cbar_ax)
+        self.cbar_ax.yaxis.set_tick_params(color="black", labelcolor="black")
+        self.fig.colorbar(self.scal_map, cax=self.cbar_ax)
 
 
     def makeCmap(self, base_cmap='coolwarm', vcenter=0, vmin=-5, vmax=5, threshold=1.0):
@@ -171,6 +234,13 @@ class IMGShow:
         else:
             return base_cmap, TwoSlopeNorm(vmin=vmin, vcenter=vcenter, vmax=vmax)
         
+    def setLinkedImg(self, img, bi_directional = True):
+        if img not in self.linked_imgs:
+            self.linked_imgs.append(img)
+        if bi_directional:
+            if self not in img.linked_imgs:
+                img.linked_imgs.append(self)
+        
 
 def stand(sig):
     return (sig - np.nanmean(sig, axis = -1)[..., np.newaxis]) / np.nanstd(sig, axis = -1)[..., np.newaxis]
@@ -180,7 +250,7 @@ def maxMinNorm(sig):
 
 norm_funcs = {"stand" : stand, "maxMin" : maxMinNorm, None : lambda x : x}
 
-def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', bg_img = None, cvr_transform = None, norm_data : str = "maxMin", data_include = "bold+regressor+predictions", voxel_mask = False, radiological = True, **custom_settings):
+def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', ax = None, bg_img = None, cvr_transform = None, norm_data : str = "maxMin", data_include = "bold+regressor+predictions", voxel_mask = False, radiological = True, **custom_settings):
     # settings
     settings = {"cmap" : "RdYlBu_r", "vcenter" : 0, "vmin" : -1, "vmax" : 1, "threshold" : None, "aspect" : "equal", "origin" : "lower", 'interpolation' : 'antialiased'}
     settings.update(custom_settings)
@@ -266,7 +336,18 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', bg_img
                 data_info = json.load(file)
             times = np.arange(0, correlations_img.shape[3]) * data_info["align-regressor-time-step"] + data_info["align-regressor-start-time"]
             corr = correlations_img.get_fdata()
-            data.append(((times, norm_func(corr)), "x-correlation"))
+            data.append(((times, norm_func(corr)), "welch power"))
+        except:
+            print("No correlation img found")
+    # get predictions
+    if "welch" in data_include:
+        try:
+            power_img = image.load_img(os.path.join(folder, preamble + "_desc-welch_power.nii.gz"))
+            with open(os.path.join(folder, preamble + "_desc-welch_power.json"), "r") as file:
+                data_info = json.load(file)
+            freq = np.arange(0, power_img.shape[3]) * data_info["FreqSamplingStep"] + data_info["StartFreq"]
+            power = power_img.get_fdata()
+            data.append(((freq, norm_func(power)), "x-correlation"))
         except:
             print("No correlation img found")
     # get voxel mask
@@ -288,8 +369,8 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', bg_img
     except:
         # voxel_mask = None
         print("Could not load voxel mask")
-
-    img_show = IMGShow(cvr_data, None, bg_data, settings, data_transform, *data)
+    
+    img_show = IMGShow(cvr_data, None, bg_data, settings, data_transform, *data, ax = ax)
     
     img_show.fig.suptitle(preamble)
 

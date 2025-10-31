@@ -348,7 +348,8 @@ class LoadPhysioData(ProcessNode):
                                                                         suffix="physio", 
                                                                             extension=".tsv*")), 
                                                                                 dtype=float, delimiter='\t')
-        
+        # make sure 2D
+        physio_ts = physio_ts if physio_ts.ndim == 2 else physio_ts[:,None]
         # check variables
         if variables is None:
             variables = tuple(columns)

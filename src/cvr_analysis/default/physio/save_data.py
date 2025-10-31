@@ -15,21 +15,25 @@ from pathlib import Path
 # create hash
 ##############################################
 def createHashCheckOverride(
-                        output_directory, subject, session, task, run,
+                        # bids
+                        output_directory, subject, session, task, run, physio_recording, data_type,
                             initial_time_limit, analysis_start_time, analysis_end_time, min_sample_freq, 
                                 detrend_linear_order, temporal_filter_freq, 
-                                    baseline_strategy, regressor, 
+                                    baseline_strategy, regressor, psc_regressor, psc_physio,
                                     # confounds
                                     include_drift_confounds, include_spike_confounds, 
                                     drift_high_pass, drift_model, drift_order, 
                                     spike_diff_cutoff, spike_global_cutoff,
+                                        # align
                                         global_align_regressor_lower_bound, global_align_regressor_upper_bound,
                                             maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, 
                                                 correlation_phat, correlation_window, correlation_multi_peak_strategy, correlation_peak_threshold,
                                                     force_run = False): 
     # folder for files
-    analysis_name = "TCD-CVR-version-" + __version__ 
-    files_folder = os.path.join(output_directory, f"sub-{subject}", f"ses-{session}", analysis_name)
+    if data_type is None:
+        raise ValueError("'data_type' need to be not 'None'")
+    files_folder = os.path.join(output_directory, f"sub-{subject}", f"ses-{session}", data_type)
+    analysis_name = "Physio-CVR-version-" + __version__ 
 
     # convert None
     def try_conv(val, type_):
@@ -74,8 +78,10 @@ def createHashCheckOverride(
         "analysis-bounds"                           : try_conv((analysis_start_time, analysis_end_time), float),
         "detrend-linear-order"                      : try_conv(detrend_linear_order, int),
         "temporal-filter-freq"                      : try_conv(temporal_filter_freq, float),
+        "psc-physio"                                : try_conv(psc_physio, bool),
         "baseline-strategy"                         : try_conv(baseline_strategy, str),
         "regressor"                                 : str(regressor),
+        "psc-regressor"                             : try_conv(psc_regressor, bool),
         "global-align-regressor-bounds"             : try_conv((global_align_regressor_lower_bound, global_align_regressor_upper_bound), float),
         "align-regressor-bounds"                    : try_conv((align_regressor_lower_bound, align_regressor_upper_bound), float),
         "maxcorr-bipolar"                           : try_conv(maxcorr_bipolar, bool),
@@ -100,7 +106,7 @@ def createHashCheckOverride(
             return f"{var}-{val}_"
         else:
             return ""
-    analysis_file = os.path.join(files_folder, f'sub-{subject}_{getBStr("ses",session)}{getBStr("task",task)}{getBStr("run",run)}analys-{analysis_id}_desc-analys_info.json')
+    analysis_file = os.path.join(files_folder, f'sub-{subject}_{getBStr("ses",session)}{getBStr("task",task)}{getBStr("run",run)}{getBStr("recording",physio_recording)}analys-{analysis_id}_desc-analys_info.json')
     # run or dont run
     run_analysis = force_run or not os.path.isfile(analysis_file)
 
@@ -117,24 +123,24 @@ def saveData(
             # analysis info data
             analysis_file, analysis_dict,
                 # pre processing data
-                subject, session, task, run, doppler_variables,
+                subject, session, task, run, physio_variables,
                     # post-processing data
-                    doppler_tr, up_sampling_factor, up_sampled_sample_time, regressor_units, 
+                    physio_tr, up_sampling_factor, up_sampled_sample_time, regressor_unit, regressor_baseline,
                         # initial global alignement
-                        initial_global_regressor_alignment, initial_global_aligned_regressor_timeseries, global_postproc_timeseries,
+                        initial_global_regressor_alignment, initial_global_aligned_regressor_timeseries, global_postproc_timeseries, global_baseline,
                             # global regressor signal fit
                             global_regressor_beta, global_regressor_timeshift_maxcorr, global_regressor_maxcorr, global_regressor_timeshifts, global_regressor_correlations, 
-                                global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions,
+                                down_sampled_global_postproc_timeseries, down_sampled_global_aligned_regressor_timeseries, down_sampled_global_regressor_predictions,
                                     # global regressor data
                                     regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
                                         global_rms, global_autocorrelation_timeshifts, global_autocorrelation_correlations, 
-                                            # doppler alignement data
+                                            # physio alignement data
                                             reference_regressor_timeshift, align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound,
-                                                doppler_postproc_timeseries, doppler_timeshift_maxcorr, doppler_maxcorr, doppler_timeshifts, doppler_correlations,
-                                                    doppler_aligned_regressor_timeseries,
-                                                        # doppler regression data
-                                                        doppler_dof, doppler_predictions, doppler_r_squared, doppler_adjusted_r_squared, doppler_standard_error, doppler_t_value,
-                                                            doppler_cvr_amplitude, doppler_p_value, regression_sample_time, doppler_units,
+                                                physio_postproc_timeseries, physio_timeshift_maxcorr, physio_maxcorr, physio_timeshifts, physio_correlations,
+                                                    physio_aligned_regressor_timeseries,
+                                                        # physio regression data
+                                                        physio_dof, physio_predictions, physio_r_squared, physio_adjusted_r_squared, physio_standard_error, physio_t_value,
+                                                            physio_cvr_amplitude, physio_p_value, regression_sample_time, physio_unit, physio_baseline,
                                                                 # confounds
                                                                 regression_confounds_df,
                                                                     # data to save
@@ -172,38 +178,39 @@ def saveData(
                 raise ValueError(f"Following data is not available: {non_available_data}")
             # 2D data
             if "postproc" in data_save_list:
-                fname = preamble + "desc-postproc_doppler"
+                fname = preamble + "desc-postproc_physio"
                 saveTimeseriesInfo(fname + ".json", 0, up_sampled_sample_time)
-                pd.DataFrame(doppler_postproc_timeseries.T, columns=doppler_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                pd.DataFrame(physio_postproc_timeseries.T, columns=physio_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             if "predictions" in data_save_list:
-                fname = preamble + "desc-predictions_doppler"
+                fname = preamble + "desc-predictions_physio"
                 saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
-                pd.DataFrame(doppler_predictions.T, columns=doppler_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                pd.DataFrame(physio_predictions.T, columns=physio_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             if "alignedregressor":
                 fname = preamble + "desc-alignedRegressor_timeseries"
                 saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
-                pd.DataFrame(doppler_aligned_regressor_timeseries.T, columns=doppler_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                pd.DataFrame(physio_aligned_regressor_timeseries.T, columns=physio_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             if "xcorrelations" in data_save_list:
                 fname = preamble + "desc-xCorrelations_timeseries"
-                saveTimeseriesInfo(fname + ".json", doppler_timeshifts[0,0], regression_sample_time)
-                pd.DataFrame(doppler_correlations.T, columns=doppler_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
+                saveTimeseriesInfo(fname + ".json", physio_timeshifts[0,0], regression_sample_time)
+                pd.DataFrame(physio_correlations.T, columns=physio_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             # dataframe data
             df_dict = {
-                "signal" : doppler_variables,
-                "unit" : [doppler_units]*len(doppler_variables),
-                "mean" : doppler_postproc_timeseries.mean(axis = 1),
-                "max" : doppler_postproc_timeseries.max(axis = 1),
-                "min" : doppler_postproc_timeseries.min(axis = 1),
-                "std" : doppler_postproc_timeseries.std(axis = 1),
-                "cvr" : doppler_cvr_amplitude,
-                "timeshift" : doppler_timeshift_maxcorr, 
-                "maxcorr" : doppler_maxcorr,
-                "pvalue" : doppler_p_value,
-                "se" : doppler_standard_error,
-                "t" : doppler_t_value,
-                "dof" : doppler_dof,
-                "rsquared" : doppler_r_squared,
-                "adj_rsquared" : doppler_adjusted_r_squared,
+                "signal" : physio_variables,
+                "unit" : [physio_unit]*len(physio_variables),
+                "mean" : physio_postproc_timeseries.mean(axis = 1),
+                "max" : physio_postproc_timeseries.max(axis = 1),
+                "min" : physio_postproc_timeseries.min(axis = 1),
+                "std" : physio_postproc_timeseries.std(axis = 1),
+                "initial baseline" : physio_baseline,
+                "cvr" : physio_cvr_amplitude,
+                "timeshift" : physio_timeshift_maxcorr, 
+                "maxcorr" : physio_maxcorr,
+                "pvalue" : physio_p_value,
+                "se" : physio_standard_error,
+                "t" : physio_t_value,
+                "dof" : physio_dof,
+                "rsquared" : physio_r_squared,
+                "adj_rsquared" : physio_adjusted_r_squared,
             }
             pd.DataFrame(df_dict).to_csv(preamble + "desc-cvr_stats.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             # 1D data
@@ -216,7 +223,7 @@ def saveData(
                 # global regressor
                 fname = preamble + "desc-globalRegressorFit_timeseries"
                 saveTimeseriesInfo(fname + ".json", 0, regression_sample_time)
-                pd.DataFrame(np.vstack((global_signal_timeseries, global_aligned_regressor_timeseries, global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "predictions"]).to_csv(fname + ".tsv.gz", sep="\t", index = False, compression="gzip")
+                pd.DataFrame(np.vstack((down_sampled_global_postproc_timeseries, down_sampled_global_aligned_regressor_timeseries, down_sampled_global_regressor_predictions)).T, columns=["global_series", "aligned_regressor_series", "predictions"]).to_csv(fname + ".tsv.gz", sep="\t", index = False, compression="gzip")
             if "globalregressorxcorrelation" in data_save_list: 
                 # global regressor correlations
                 fname = preamble + "desc-globalRegressorrXCorrelation_timeseries"
@@ -248,21 +255,23 @@ def saveData(
                         "session"                               : session,
                         "task"                                  : task,
                         "run"                                   : run, 
-                        "doppler-tr"                            : doppler_tr,
+                        "physio-tr"                             : physio_tr,
                         # post-processing data  
                         "up-sampling-factor"                    : up_sampling_factor,
                         "up-sampled-sample-time"                : up_sampled_sample_time,
                         "regression-sample-time"                : regression_sample_time,
                         # global regressor data
-                        "regressor-units"                       : regressor_units,
-                        "doppler-units"                         : doppler_units,
+                        "regressor-unit"                        : regressor_unit,
+                        "regressor-initial-baseline"            : regressor_baseline,
+                        "physio-unit"                           : physio_unit,
                         "initial-global-regressor-alignment"    : initial_global_regressor_alignment,
                         "global-regressor-timeshift-maxcorr"    : global_regressor_timeshift_maxcorr,
                         "global-regressor-maxcorr"              : global_regressor_maxcorr,
                         "global-regressor-beta"                 : global_regressor_beta,
                         "regressor-rms"                         : regressor_rms,
                         "global-rms"                            : global_rms,
-                        # doppler alignment data
+                        "global-initial-baseline"               : global_baseline,
+                        # physio alignment data
                         "reference-regressor-timeshift"         : reference_regressor_timeshift, 
                         "align-regressor-absolute-bounds"       : (align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound),
                         # confound names
