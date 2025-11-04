@@ -124,7 +124,7 @@ def createHashCheckOverride(
         "refine-regressor-nr-recursions"            : try_conv(refine_regressor_nr_recursions, int),
         "refine-regressor-correlation-threshold"    : try_conv(refine_regressor_correlation_threshold, float),
         "refine-regressor-explained-variance"       : try_conv(refine_regressor_explained_variance, float),
-        "dtw-to-ensure-regressor-unit"             : bool(do_dtw),
+        "dtw-to-ensure-regressor-unit"              : bool(do_dtw),
         "dtw-dispersion"                            : try_conv(dtw_dispersion, float),
         "include-motion-confounds"                  : bool(include_motion_confounds),
         "include-drift-confounds"                   : bool(include_drift_confounds),

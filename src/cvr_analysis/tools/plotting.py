@@ -260,7 +260,18 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', ax = N
     folder, analys_file = os.path.split(analysis_file)
     preamble = analys_file.split("_desc-analys_info")[0]
     # cvr img
-    cvr_img = image.load_img(os.path.join(folder, preamble + f"_desc-{img_desc}_map.nii.gz"))
+    if img_desc == "residual_ratio":
+        # residuals_img = image.math_img("postproc - pred", postproc = os.path.join(folder, preamble + "_desc-postproc_bold.nii.gz"), pred = os.path.join(folder, preamble + "_desc-predictions_bold.nii.gz"))
+        # moving_mean = voxelwise_centered_moving_average_scipy(residuals_img,window = 10,nan_policy="omit")
+        # residuals_demean_var = image.math_img("np.nanvar(resid - moving, axis = -1)", resid = residuals_img, moving = moving_mean)
+        # cvr_img = image.math_img("np.where(res_var > 0, np.nanvar(moving, axis=-1) / res_var, 0)", res_var = residuals_demean_var, moving = moving_mean)
+        
+        residuals_img = image.math_img("postproc - pred", postproc = os.path.join(folder, preamble + "_desc-postproc_bold.nii.gz"), pred = os.path.join(folder, preamble + "_desc-predictions_bold.nii.gz"))
+        # ratio = lf_hf_metrics_4d(np.nan_to_num(residuals_img.get_fdata(), nan=0.0), 1/1.3, 1/30, return_fraction=False)
+        flat = spectral_flatness_4d(np.nan_to_num(residuals_img.get_fdata(), nan=0.0), 1/1.3)
+        cvr_img = image.new_img_like(residuals_img, flat)
+    else:
+        cvr_img = image.load_img(os.path.join(folder, preamble + f"_desc-{img_desc}_map.nii.gz"))
     # sotr inverse tranform going from real space to cvr space
     data_transform = np.linalg.inv(cvr_img.affine)
     if bg_img is not None:
@@ -328,6 +339,15 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', ax = N
             data.append((norm_func(predictions_img.get_fdata()), "predictions"))
         except:
             print("No predictions img found")
+    # get residuals
+    if "residuals" in data_include:
+        try:
+            residuals_img = image.math_img("postproc - pred", postproc = os.path.join(folder, preamble + "_desc-postproc_bold.nii.gz"), pred = os.path.join(folder, preamble + "_desc-predictions_bold.nii.gz"))
+            data.append((norm_func(residuals_img.get_fdata()), "residuals"))
+            moving_mean = voxelwise_centered_moving_average_scipy(residuals_img,window = 30,nan_policy="omit")
+            data.append((norm_func(moving_mean.get_fdata()), "moving_mean"))
+        except:
+            print("No predictions img found")
     # get predictions
     if "correlations" in data_include:
         try:
@@ -375,6 +395,200 @@ def showCVRAnalysisResult(analysis_file : str, img_desc = 'cvrAmplitude', ax = N
     img_show.fig.suptitle(preamble)
 
     return img_show 
+
+import numpy as np
+from scipy.ndimage import uniform_filter1d
+
+def voxelwise_centered_moving_average_scipy(residuals_img, window=11, mode="reflect", nan_policy="propagate"):
+    """
+    Centered moving average using SciPy's uniform_filter1d (no phase shift).
+
+    Parameters
+    ----------
+    residuals_4d : np.ndarray
+        4D residual map, shape (X, Y, Z, T).
+    window : int
+        Window size.
+    mode : str
+        Boundary handling for uniform_filter1d ("reflect", "nearest", "mirror", "wrap", "constant").
+    nan_policy : {"propagate", "omit"}
+        If "omit", temporarily fills NaNs by local means via two passes (mask + renormalization).
+
+    Returns
+    -------
+    mav : np.ndarray
+        Centered moving average with the same shape as input.
+    """
+    if residuals_img.ndim != 4:
+        raise ValueError("residuals_4d must be 4D (X, Y, Z, T)")
+
+    arr = residuals_img.get_fdata()
+
+    if nan_policy == "propagate":
+        # Simple centered filter; NaNs will propagate through neighborhoods
+        return uniform_filter1d(arr, size=window, axis=-1, mode=mode, origin=0)
+
+    elif nan_policy == "omit":
+        # Compute local sums and counts, then divide to ignore NaNs
+        valid = (~np.isnan(arr)).astype(arr.dtype)
+        arr_filled = np.nan_to_num(arr, nan=0.0)
+
+        local_sum   = uniform_filter1d(arr_filled, size=window, axis=-1, mode=mode, origin=0)
+        local_count = uniform_filter1d(valid,     size=window, axis=-1, mode=mode, origin=0)
+
+        with np.errstate(invalid="ignore", divide="ignore"):
+            mav = local_sum / local_count
+        # Where count==0, set back to NaN
+        mav[local_count == 0] = np.nan
+        return image.new_img_like(residuals_img, mav)
+
+    else:
+        raise ValueError("nan_policy must be 'propagate' or 'omit'")
+
+
+def voxelwise_variance_of_centered_moving_average_scipy(residuals_4d, window=11, **kwargs):
+    mav = voxelwise_centered_moving_average_scipy(residuals_4d, window=window, **kwargs)
+    return np.nanvar(mav, axis=-1)
+import numpy as np
+from scipy.signal import welch
+
+def lf_hf_metrics_4d(
+    data_4d,
+    fs,
+    f_c,
+    nperseg=None,
+    noverlap=None,
+    detrend='constant',
+    window='hann',
+    average='mean',
+    return_fraction=True,
+):
+    """
+    Compute per-voxel LF/HF bandpower metrics for a 4D time series (X, Y, Z, T).
+
+    Parameters
+    ----------
+    data_4d : np.ndarray
+        4D array with shape (X, Y, Z, T).
+    fs : float
+        Sampling rate (Hz).
+    f_c : float
+        Cutoff frequency (Hz) separating low and high bands (0..Nyquist).
+    nperseg, noverlap, detrend, window, average :
+        Passed to scipy.signal.welch. Set nperseg to control frequency resolution.
+        If None, SciPy chooses sensible defaults.
+    return_fraction : bool
+        If True, returns LF fraction = LF / (LF + HF); otherwise returns LF/HF ratio.
+
+    Returns
+    -------
+    metric_3d : np.ndarray
+        3D array (X, Y, Z) of LF fraction or LF/HF ratio per voxel.
+        Voxels with zero HF power get np.inf for the ratio and 1.0 for the fraction.
+    f : np.ndarray
+        1D frequency vector used by Welch (Hz).
+    """
+    if data_4d.ndim != 4:
+        raise ValueError("data_4d must be 4D with shape (X, Y, Z, T).")
+
+    # Welch PSD along time axis for all voxels at once
+    f, Pxx = welch(
+        data_4d,
+        fs=fs,
+        window=window,
+        nperseg=nperseg,
+        noverlap=noverlap,
+        detrend=detrend,
+        return_onesided=True,
+        scaling='density',
+        axis=-1,
+        average=average,
+    )
+    # Pxx shape: (X, Y, Z, F), f shape: (F,)
+
+    # Build masks for LF and HF bands
+    # Include DC in LF; put the boundary in HF or LF consistently (here HF includes f >= f_c)
+    lf_mask = (f >= 0) & (f < f_c)
+    hf_mask = (f >= f_c)
+
+    # Integrate band powers with trapezoid rule along frequency axis
+    # np.trapz supports x as 1D; broadcasting along axis=-1 works.
+    lf_power = np.trapezoid(Pxx[..., lf_mask], f[lf_mask], axis=-1)
+    hf_power = np.trapezoid(Pxx[..., hf_mask], f[hf_mask], axis=-1)
+
+    if return_fraction:
+        total = lf_power + hf_power
+        with np.errstate(invalid='ignore', divide='ignore'):
+            frac = lf_power / total
+        # Where both bands are zero, set to NaN (no power at all)
+        frac[(total == 0)] = np.nan
+        return frac
+    else:
+        with np.errstate(invalid='ignore', divide='ignore'):
+            ratio = lf_power / hf_power
+        # If hf_power is zero but lf_power > 0 → inf; if both zero → NaN
+        ratio[(hf_power == 0) & (lf_power == 0)] = np.nan
+        return ratio
+
+
+def spectral_flatness_4d(
+    data_4d,
+    fs,
+    nperseg=None,
+    noverlap=None,
+    detrend='constant',
+    window='hann',
+    average='mean',
+    eps=1e-30,
+):
+    """
+    Per-voxel spectral flatness (Wiener entropy) for 4D time series (X, Y, Z, T).
+
+    SFM ≈ 1 → white/noise-like (flat spectrum)
+    SFM → 0 → structured/peaked (e.g., strong low-frequency or tones)
+
+    Parameters
+    ----------
+    data_4d : np.ndarray, shape (X, Y, Z, T)
+    fs : float
+        Sampling rate (Hz).
+    nperseg, noverlap, detrend, window, average :
+        Passed to scipy.signal.welch.
+    eps : float
+        Floor to avoid log(0).
+
+    Returns
+    -------
+    sfm_3d : np.ndarray
+        3D array (X, Y, Z) of spectral flatness per voxel.
+    f : np.ndarray
+        1D frequency vector used by Welch (Hz).
+    """
+    if data_4d.ndim != 4:
+        raise ValueError("data_4d must be 4D with shape (X, Y, Z, T).")
+
+    f, Pxx = welch(
+        data_4d,
+        fs=fs,
+        window=window,
+        nperseg=nperseg,
+        noverlap=noverlap,
+        detrend=detrend,
+        return_onesided=True,
+        scaling='density',
+        axis=-1,
+        average=average,
+    )  # Pxx: (X, Y, Z, F)
+
+    # Geometric mean / arithmetic mean along frequency axis
+    Pxx_safe = np.maximum(Pxx, eps)
+    gm = np.exp(np.mean(np.log(Pxx_safe), axis=-1))
+    am = np.mean(Pxx, axis=-1)  # allow zeros here; gm floor already handled
+    with np.errstate(invalid='ignore', divide='ignore'):
+        sfm = gm / am
+    # If spectrum is entirely zero at a voxel (degenerate), set NaN
+    sfm[(am == 0)] = np.nan
+    return sfm
 
 if __name__ == "__main__":
     img_show = showCVRAnalysisResult(sys.argv[1])

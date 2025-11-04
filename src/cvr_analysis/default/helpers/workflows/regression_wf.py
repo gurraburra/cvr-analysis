@@ -459,6 +459,12 @@ setup_regression_wf = ProcessWorkflow(
         (global_regressor_regression_wf.output.down_sampled_global_aligned_regressor_postproc_timeseries, ProcessWorkflow.output.down_sampled_global_aligned_regressor_postproc_timeseries),
         (global_regressor_regression_wf.output.regressor_beta, ProcessWorkflow.output.global_regressor_beta),
         (global_regressor_regression_wf.output.predictions, ProcessWorkflow.output.down_sampled_global_regressor_predictions),
+        (global_regressor_regression_wf.output.regressor_p, ProcessWorkflow.output.global_regressor_p_value),
+        (global_regressor_regression_wf.output.regressor_se, ProcessWorkflow.output.global_regressor_se),
+        (global_regressor_regression_wf.output.regressor_t, ProcessWorkflow.output.global_regressor_t_value),
+        (global_regressor_regression_wf.output.dof, ProcessWorkflow.output.global_regressor_dof),
+        (global_regressor_regression_wf.output.r_squared, ProcessWorkflow.output.global_regressor_r_squared),
+        (global_regressor_regression_wf.output.adjusted_r_squared, ProcessWorkflow.output.global_regressor_adjusted_r_squared),
         
     ),
     description="setup regression wf"
@@ -542,9 +548,8 @@ regression_wf = ProcessWorkflow(
         (ProcessWorkflow.input._, setup_regression_wf.input.all),
         (setup_regression_wf.output.all / setup_regression_wf.output.setup_reference_regressor_timeshift, ProcessWorkflow.output._),
         # iterative regression
-        (ProcessWorkflow.input._, iterate_cvr_wf.input[("sample_time", "timeseries_masker", "down_sampling_factor", "nr_parallel_processes", "show_pbar", "align_regressor_lower_bound", "align_regressor_upper_bound", "maxcorr_bipolar", "correlation_window", "correlation_phat", "correlation_peak_threshold", "correlation_multi_peak_strategy", "filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "confound_regressor_correlation_threshold")]),
-        (ProcessWorkflow.input.depvars_postproc_timeseries, iterate_cvr_wf.input.depvars_postproc_timeseries),
-        (ProcessWorkflow.input.regressor_postproc_timeseries, iterate_cvr_wf.input.regressor_postproc_timeseries),
+        (ProcessWorkflow.input._, iterate_cvr_wf.input[("sample_time", "timeseries_masker", "down_sampling_factor", "nr_parallel_processes", "show_pbar", "align_regressor_lower_bound", "align_regressor_upper_bound", "maxcorr_bipolar", "correlation_window", "correlation_phat", "correlation_peak_threshold", "correlation_multi_peak_strategy", "filter_timeshifts_size", "filter_timeshifts_filter_type", "filter_timeshifts_smooth_fwhm", "confound_regressor_correlation_threshold", "depvars_postproc_timeseries")]),
+        (setup_regression_wf.output.regressor_postproc_timeseries, iterate_cvr_wf.input.regressor_postproc_timeseries),
         (setup_regression_wf.output.setup_reference_regressor_timeshift, iterate_cvr_wf.input.reference_regressor_timeshift),
         (setup_regression_wf.output.down_sampled_regression_confounds_postproc_df, iterate_cvr_wf.input.down_sampled_regression_confounds_postproc_df),
         (iterate_cvr_wf.output.all / iterate_cvr_wf.output.iterate_reference_regressor_timeshift, ProcessWorkflow.output._),

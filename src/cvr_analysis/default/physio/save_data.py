@@ -20,15 +20,17 @@ def createHashCheckOverride(
                             initial_time_limit, analysis_start_time, analysis_end_time, min_sample_freq, 
                                 detrend_linear_order, temporal_filter_freq, 
                                     baseline_strategy, regressor, psc_regressor, psc_physio,
-                                    # confounds
-                                    include_drift_confounds, include_spike_confounds, 
-                                    drift_high_pass, drift_model, drift_order, 
-                                    spike_diff_cutoff, spike_global_cutoff,
-                                        # align
-                                        global_align_regressor_lower_bound, global_align_regressor_upper_bound,
-                                            maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, 
-                                                correlation_phat, correlation_window, correlation_multi_peak_strategy, correlation_peak_threshold,
-                                                    force_run = False): 
+                                        refine_regressor_correlation_threshold, refine_regressor_explained_variance, refine_regressor_nr_recursions,
+                                            do_dtw, dtw_dispersion,
+                                                # confounds
+                                                include_drift_confounds, include_spike_confounds, 
+                                                    drift_high_pass, drift_model, drift_order, 
+                                                        spike_diff_cutoff, spike_global_cutoff,
+                                                            # align
+                                                            global_align_regressor_lower_bound, global_align_regressor_upper_bound,
+                                                                maxcorr_bipolar, align_regressor_lower_bound, align_regressor_upper_bound, 
+                                                                    correlation_phat, correlation_window, correlation_multi_peak_strategy, correlation_peak_threshold,
+                                                                        force_run = False): 
     # folder for files
     if data_type is None:
         raise ValueError("'data_type' need to be not 'None'")
@@ -69,6 +71,16 @@ def createHashCheckOverride(
     # initial time limit
     if analysis_start_time is None and analysis_end_time is None:
         initial_time_limit = None
+
+    # check if refining regressor, if not change parameters
+    if refine_regressor_nr_recursions <= 0:
+        refine_regressor_nr_recursions = 0
+        refine_regressor_explained_variance = None
+        refine_regressor_correlation_threshold = None
+
+    # dtw disperion
+    if not do_dtw:
+        dtw_dispersion = None
    
     # analysis info
     analysis_info = {
@@ -82,6 +94,11 @@ def createHashCheckOverride(
         "baseline-strategy"                         : try_conv(baseline_strategy, str),
         "regressor"                                 : str(regressor),
         "psc-regressor"                             : try_conv(psc_regressor, bool),
+        "refine-regressor-nr-recursions"            : try_conv(refine_regressor_nr_recursions, int),
+        "refine-regressor-correlation-threshold"    : try_conv(refine_regressor_correlation_threshold, float),
+        "refine-regressor-explained-variance"       : try_conv(refine_regressor_explained_variance, float),
+        "dtw-to-ensure-regressor-unit"              : bool(do_dtw),
+        "dtw-dispersion"                            : try_conv(dtw_dispersion, float),
         "global-align-regressor-bounds"             : try_conv((global_align_regressor_lower_bound, global_align_regressor_upper_bound), float),
         "align-regressor-bounds"                    : try_conv((align_regressor_lower_bound, align_regressor_upper_bound), float),
         "maxcorr-bipolar"                           : try_conv(maxcorr_bipolar, bool),
@@ -129,22 +146,23 @@ def saveData(
                         # initial global alignement
                         initial_global_regressor_alignment, initial_global_aligned_regressor_timeseries, global_postproc_timeseries, global_baseline,
                             # global regressor signal fit
-                            global_regressor_beta, global_regressor_timeshift_maxcorr, global_regressor_maxcorr, global_regressor_timeshifts, global_regressor_correlations, 
-                                down_sampled_global_postproc_timeseries, down_sampled_global_aligned_regressor_timeseries, down_sampled_global_regressor_predictions,
-                                    # global regressor data
-                                    regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
-                                        global_rms, global_autocorrelation_timeshifts, global_autocorrelation_correlations, 
-                                            # physio alignement data
-                                            reference_regressor_timeshift, align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound,
-                                                physio_postproc_timeseries, physio_timeshift_maxcorr, physio_maxcorr, physio_timeshifts, physio_correlations,
-                                                    physio_aligned_regressor_timeseries,
-                                                        # physio regression data
-                                                        physio_dof, physio_predictions, physio_r_squared, physio_adjusted_r_squared, physio_standard_error, physio_t_value,
-                                                            physio_cvr_amplitude, physio_p_value, regression_sample_time, physio_unit, physio_baseline,
-                                                                # confounds
-                                                                regression_confounds_df,
-                                                                    # data to save
-                                                                    data_to_save = "cvr+tshift+pvalue") -> tuple:
+                            global_regressor_cvr_amplitude, global_regressor_timeshift_maxcorr, global_regressor_maxcorr, global_regressor_timeshifts, global_regressor_correlations,
+                                global_regressor_p_value, global_regressor_standard_error, global_regressor_t_value, global_regressor_dof, global_regressor_r_squared, global_regressor_adjusted_r_squared,
+                                    down_sampled_global_postproc_timeseries, down_sampled_global_aligned_regressor_timeseries, down_sampled_global_regressor_predictions,
+                                        # global regressor data
+                                        regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
+                                            global_rms, global_autocorrelation_timeshifts, global_autocorrelation_correlations, 
+                                                # physio alignement data
+                                                reference_regressor_timeshift, align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound,
+                                                    physio_postproc_timeseries, physio_timeshift_maxcorr, physio_maxcorr, physio_timeshifts, physio_correlations,
+                                                        physio_aligned_regressor_timeseries,
+                                                            # physio regression data
+                                                            physio_dof, physio_predictions, physio_r_squared, physio_adjusted_r_squared, physio_standard_error, physio_t_value,
+                                                                physio_cvr_amplitude, physio_p_value, regression_sample_time, physio_unit, physio_baseline,
+                                                                    # confounds
+                                                                    regression_confounds_df,
+                                                                        # data to save
+                                                                        data_to_save = "cvr+tshift+pvalue") -> tuple:
         # timeseries info
         def saveTimeseriesInfo(name, start_time, time_step):
             dict_ = {"start-time" : start_time, "time-step" : time_step}
@@ -195,22 +213,22 @@ def saveData(
                 pd.DataFrame(physio_correlations.T, columns=physio_variables).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             # dataframe data
             df_dict = {
-                "signal" : physio_variables,
-                "unit" : [physio_unit]*len(physio_variables),
-                "mean" : physio_postproc_timeseries.mean(axis = 1),
-                "max" : physio_postproc_timeseries.max(axis = 1),
-                "min" : physio_postproc_timeseries.min(axis = 1),
-                "std" : physio_postproc_timeseries.std(axis = 1),
-                "initial baseline" : physio_baseline,
-                "cvr" : physio_cvr_amplitude,
-                "timeshift" : physio_timeshift_maxcorr, 
-                "maxcorr" : physio_maxcorr,
-                "pvalue" : physio_p_value,
-                "se" : physio_standard_error,
-                "t" : physio_t_value,
-                "dof" : physio_dof,
-                "rsquared" : physio_r_squared,
-                "adj_rsquared" : physio_adjusted_r_squared,
+                "signal" : tuple(physio_variables) + ("global", ),
+                "unit" : [physio_unit]*(len(physio_variables) + 1),
+                "mean" : np.append(physio_postproc_timeseries.mean(axis = 1), global_postproc_timeseries.mean()),
+                "max" : np.append(physio_postproc_timeseries.max(axis = 1), global_postproc_timeseries.max()),
+                "min" : np.append(physio_postproc_timeseries.min(axis = 1), global_postproc_timeseries.min()),
+                "std" : np.append(physio_postproc_timeseries.std(axis = 1), global_postproc_timeseries.std()),
+                "init_baseline" : np.append(physio_baseline, global_baseline),
+                "cvr" : np.append(physio_cvr_amplitude,global_regressor_cvr_amplitude),
+                "timeshift" : np.append(physio_timeshift_maxcorr, global_regressor_timeshift_maxcorr), 
+                "maxcorr" : np.append(physio_maxcorr, global_regressor_maxcorr),
+                "p" : np.append(physio_p_value, global_regressor_p_value),
+                "se" : np.append(physio_standard_error, global_regressor_standard_error),
+                "t" : np.append(physio_t_value, global_regressor_t_value),
+                "dof" : np.append(physio_dof, global_regressor_dof),
+                "r2" : np.append(physio_r_squared, global_regressor_r_squared),
+                "adj_r2" : np.append(physio_adjusted_r_squared, global_regressor_adjusted_r_squared),
             }
             pd.DataFrame(df_dict).to_csv(preamble + "desc-cvr_stats.tsv.gz", sep="\t", index = False, header = True, compression="gzip")
             # 1D data
@@ -256,21 +274,14 @@ def saveData(
                         "task"                                  : task,
                         "run"                                   : run, 
                         "physio-tr"                             : physio_tr,
+                        # global regressor data
+                        "regressor-unit"                        : regressor_unit,
+                        "regressor-initial-baseline"            : regressor_baseline,
+                        "initial-global-regressor-alignment"    : initial_global_regressor_alignment,
                         # post-processing data  
                         "up-sampling-factor"                    : up_sampling_factor,
                         "up-sampled-sample-time"                : up_sampled_sample_time,
                         "regression-sample-time"                : regression_sample_time,
-                        # global regressor data
-                        "regressor-unit"                        : regressor_unit,
-                        "regressor-initial-baseline"            : regressor_baseline,
-                        "physio-unit"                           : physio_unit,
-                        "initial-global-regressor-alignment"    : initial_global_regressor_alignment,
-                        "global-regressor-timeshift-maxcorr"    : global_regressor_timeshift_maxcorr,
-                        "global-regressor-maxcorr"              : global_regressor_maxcorr,
-                        "global-regressor-beta"                 : global_regressor_beta,
-                        "regressor-rms"                         : regressor_rms,
-                        "global-rms"                            : global_rms,
-                        "global-initial-baseline"               : global_baseline,
                         # physio alignment data
                         "reference-regressor-timeshift"         : reference_regressor_timeshift, 
                         "align-regressor-absolute-bounds"       : (align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound),
