@@ -149,20 +149,17 @@ def saveData(
                             global_regressor_cvr_amplitude, global_regressor_timeshift_maxcorr, global_regressor_maxcorr, global_regressor_timeshifts, global_regressor_correlations,
                                 global_regressor_p_value, global_regressor_standard_error, global_regressor_t_value, global_regressor_dof, global_regressor_r_squared, global_regressor_adjusted_r_squared,
                                     down_sampled_global_postproc_timeseries, down_sampled_global_aligned_regressor_timeseries, down_sampled_global_regressor_predictions,
-                                        # global regressor data
-                                        regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
-                                            global_rms, global_autocorrelation_timeshifts, global_autocorrelation_correlations, 
-                                                # physio alignement data
-                                                reference_regressor_timeshift, align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound,
-                                                    physio_postproc_timeseries, physio_timeshift_maxcorr, physio_maxcorr, physio_timeshifts, physio_correlations,
-                                                        physio_aligned_regressor_timeseries,
-                                                            # physio regression data
-                                                            physio_dof, physio_predictions, physio_r_squared, physio_adjusted_r_squared, physio_standard_error, physio_t_value,
-                                                                physio_cvr_amplitude, physio_p_value, regression_sample_time, physio_unit, physio_baseline,
-                                                                    # confounds
-                                                                    regression_confounds_df,
-                                                                        # data to save
-                                                                        data_to_save = "cvr+tshift+pvalue") -> tuple:
+                                        # physio alignement data
+                                        reference_regressor_timeshift, align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound,
+                                            physio_postproc_timeseries, physio_timeshift_maxcorr, physio_maxcorr, physio_timeshifts, physio_correlations,
+                                                physio_aligned_regressor_timeseries,
+                                                    # physio regression data
+                                                    physio_dof, physio_predictions, physio_r_squared, physio_adjusted_r_squared, physio_standard_error, physio_t_value,
+                                                        physio_cvr_amplitude, physio_p_value, regression_sample_time, physio_unit, physio_baseline,
+                                                            # confounds
+                                                            regression_confounds_df,
+                                                                # data to save
+                                                                data_to_save = "cvr+tshift+pvalue") -> tuple:
         # timeseries info
         def saveTimeseriesInfo(name, start_time, time_step):
             dict_ = {"start-time" : start_time, "time-step" : time_step}
@@ -188,8 +185,7 @@ def saveData(
                 raise ValueError("'data_to_save' needs to be string or list.")
             # check if all data specified in available
             available_data = {"postproc", "xcorrelations", "alignedregressor", "predictions", 
-                                "initialglobalalignedregressorseries", "globalregressorfit",
-                                    "globalregressorxcorrelation", "globalautocorrelation", "regressorautocorrelation", 
+                                "initialglobalalignedregressorseries", "globalregressorfit", "globalregressorxcorrelation",
                                         "confounds"}
             non_available_data = set(data_save_list) - available_data 
             if non_available_data:
@@ -247,16 +243,6 @@ def saveData(
                 fname = preamble + "desc-globalRegressorrXCorrelation_timeseries"
                 saveTimeseriesInfo(fname + ".json", global_regressor_timeshifts[0], up_sampled_sample_time)
                 pd.Series(global_regressor_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header=False, compression="gzip")
-            if "regressorautocorrelation" in data_save_list: 
-                # regressor autocorrelation
-                fname = preamble + "desc-regressorAutocorrelation_timeseries"
-                saveTimeseriesInfo(fname + ".json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(regressor_autocorrelation_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
-            if "globalautocorrelation" in data_save_list:
-                # global autocorrelation
-                fname = preamble + "desc-globalAutocorrelation_timeseries"
-                saveTimeseriesInfo(fname + ".json", global_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(global_autocorrelation_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
             if "confounds" in data_save_list and regression_confounds_df is not None:
                 # confounds
                 fname = preamble + "desc-confounds_timeseries"

@@ -7,7 +7,7 @@ import pandas as pd
 from nilearn import maskers
 import json
 
-from process_control import ConditionalNode, CustomNode
+from process_control import CustomNode
 from cvr_analysis import __version__
 from pathlib import Path
 
@@ -173,20 +173,17 @@ def saveData(
                                 # global regressor signal fit
                                 global_regressor_beta, global_regressor_timeshift_maxcorr, global_regressor_maxcorr, global_regressor_timeshifts, global_regressor_correlations, 
                                     down_sampled_global_postproc_timeseries, down_sampled_global_aligned_regressor_timeseries, down_sampled_global_regressor_predictions,
-                                        # global regressor data
-                                        regressor_rms, regressor_autocorrelation_timeshifts, regressor_autocorrelation_correlations, 
-                                            global_rms, global_autocorrelation_timeshifts, global_autocorrelation_correlations, 
-                                                # bold alignement data
-                                                reference_regressor_timeshift, align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound,
-                                                    bold_postproc_timeseries, bold_timeshift_maxcorr, bold_maxcorr, bold_timeshifts, bold_correlations,
-                                                        bold_aligned_regressor_timeseries,
-                                                            # bold regression data
-                                                            bold_dof, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_standard_error, bold_t_value,
-                                                                bold_cvr_amplitude, bold_p_value, regression_sample_time, bold_unit, bold_baseline,
-                                                                # confounds
-                                                                regression_confounds_df,
-                                                                    # data to save
-                                                                    data_to_save = "cvr+tshift+pvalue") -> tuple:
+                                        # bold alignement data
+                                        reference_regressor_timeshift, align_regressor_absolute_lower_bound, align_regressor_absolute_upper_bound,
+                                            bold_postproc_timeseries, bold_timeshift_maxcorr, bold_maxcorr, bold_timeshifts, bold_correlations,
+                                                bold_aligned_regressor_timeseries,
+                                                    # bold regression data
+                                                    bold_dof, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_standard_error, bold_t_value,
+                                                        bold_cvr_amplitude, bold_p_value, regression_sample_time, bold_unit, bold_baseline,
+                                                        # confounds
+                                                        regression_confounds_df,
+                                                            # data to save
+                                                            data_to_save = "cvr+tshift+pvalue") -> tuple:
         
         # timeseries info
         def saveTimeseriesInfo(name, start_time, time_step):
@@ -214,8 +211,7 @@ def saveData(
             # check if all data specified in available
             available_data = {"postproc", "xcorrelations", "alignedregressor", "predictions", 
                               "cvr", "tshift", "pvalue", "tvalue", "se", "rsquared", "adjustedrsquared", "maxcorr", "dof", 
-                                "initialglobalalignedregressorseries", "globalregressorfit",
-                                    "globalregressorxcorrelation", "globalautocorrelation", "regressorautocorrelation", 
+                                "initialglobalalignedregressorseries", "globalregressorfit", "globalregressorxcorrelation",
                                         "confounds", "mask"}
             non_available_data = set(data_save_list) - available_data 
             if non_available_data:
@@ -277,16 +273,6 @@ def saveData(
                 fname = preamble + "desc-globalRegressorrXCorrelation_timeseries"
                 saveTimeseriesInfo(fname + ".json", global_regressor_timeshifts[0], up_sampled_sample_time)
                 pd.Series(global_regressor_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header=False, compression="gzip")
-            if "regressorautocorrelation" in data_save_list: 
-                # regressor autocorrelation
-                fname = preamble + "desc-regressorAutocorrelation_timeseries"
-                saveTimeseriesInfo(fname + ".json", regressor_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(regressor_autocorrelation_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
-            if "globalautocorrelation" in data_save_list:
-                # global autocorrelation
-                fname = preamble + "desc-globalAutocorrelation_timeseries"
-                saveTimeseriesInfo(fname + ".json", global_autocorrelation_timeshifts[0], up_sampled_sample_time)
-                pd.Series(global_autocorrelation_correlations).to_csv(fname + ".tsv.gz", sep="\t", index = False, header = False, compression="gzip")
             if "confounds" in data_save_list and regression_confounds_df is not None:
                 # confounds
                 fname = preamble + "desc-confounds_timeseries"
@@ -326,8 +312,6 @@ def saveData(
                         "global-regressor-timeshift-maxcorr"    : global_regressor_timeshift_maxcorr,
                         "global-regressor-maxcorr"              : global_regressor_maxcorr,
                         "global-regressor-beta"                 : global_regressor_beta,
-                        "regressor-rms"                         : regressor_rms,
-                        "global-rms"                            : global_rms,
                         "global-initial-baseline"               : global_baseline,
                         # bold alignment data
                         "reference-regressor-timeshift"         : reference_regressor_timeshift, 

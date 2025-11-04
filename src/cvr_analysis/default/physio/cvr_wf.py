@@ -4,6 +4,8 @@ from process_control import ProcessWorkflow, ConditionalNode, ValueNode
 from cvr_analysis.default.physio.load_data_wf import load_data_wf
 from cvr_analysis.default.helpers.workflows.post_processing_wf import post_processing_wf
 from cvr_analysis.default.helpers.workflows.regression_wf import regression_wf
+from cvr_analysis.default.helpers.workflows.get_confounds import get_regression_confounds_wf
+from cvr_analysis.default.helpers.workflows.refine_regressor import refine_regressor_wf
 from cvr_analysis.default.physio.save_data import create_hash_check_override, save_data_node
 
 # %%
@@ -26,20 +28,29 @@ cvr_analysis_wf = ProcessWorkflow(
         (load_data_wf.output.regressor_times, post_processing_wf.input.regressor_times),
         (load_data_wf.output.regressor_timeseries, post_processing_wf.input.regressor_timeseries),
         (load_data_wf.output.regressor_unit, post_processing_wf.input.regressor_unit),
+        # get confounds
+        (ProcessWorkflow.input._, get_regression_confounds_wf.input[("drift_high_pass", "drift_model", "drift_order", "include_drift_confounds", "include_spike_confounds", "spike_diff_cutoff", "spike_global_cutoff")]),
+        (ValueNode(None).output.value, get_regression_confounds_wf.input.confounds_df),
+        (ValueNode(False).output.value, get_regression_confounds_wf.input[("include_motion_confounds", "motion_derivatives", "motion_powers")]),
+        (post_processing_wf.output.depvars_postproc_timeseries, get_regression_confounds_wf.input.depvars_timeseries),
+        (post_processing_wf.output.global_postproc_timeseries, get_regression_confounds_wf.input.global_timeseries),
+        (post_processing_wf.output.up_sampling_factor, get_regression_confounds_wf.input.down_sampling_factor),
+        (post_processing_wf.output.up_sampled_sample_time, get_regression_confounds_wf.input.time_step),
+        # refine regressor wf
+        (ProcessWorkflow.input._, refine_regressor_wf.input.all / refine_regressor_wf.input[("depvars_timeseries", "regressor_timeseries", "sample_time")]),
+        (post_processing_wf.output.depvars_postproc_timeseries, refine_regressor_wf.input.depvars_timeseries),
+        (post_processing_wf.output.regressor_postproc_timeseries, refine_regressor_wf.input.regressor_timeseries),
+        (post_processing_wf.output.up_sampled_sample_time, refine_regressor_wf.input.sample_time),
         # regression 
-        (ProcessWorkflow.input._, regression_wf.input.all - regression_wf.input[("confounds_postproc_df", "depvars_postproc_timeseries", "down_sampling_factor", "global_postproc_timeseries", "regressor_postproc_timeseries", "sample_time", "timeseries_masker", "filter_timeshifts_filter_type", "filter_timeshifts_size", "filter_timeshifts_smooth_fwhm", "include_motion_confounds", "confound_regressor_correlation_threshold", "motion_derivatives", "motion_powers")]),
-        (ValueNode(None).output.value, regression_wf.input[("timeseries_masker", "filter_timeshifts_filter_type", "filter_timeshifts_size", "filter_timeshifts_smooth_fwhm", "confound_regressor_correlation_threshold", "confounds_postproc_df")]),
-        (ValueNode(False).output.value, regression_wf.input[("include_motion_confounds", "motion_derivatives", "motion_powers")]),
-        (post_processing_wf.output.depvars_postproc_timeseries, regression_wf.input.depvars_postproc_timeseries),
-        (post_processing_wf.output.global_postproc_timeseries, regression_wf.input.global_postproc_timeseries),
-        (post_processing_wf.output.regressor_postproc_timeseries, regression_wf.input.regressor_postproc_timeseries),
+        (ProcessWorkflow.input._, regression_wf.input.all - regression_wf.input[("depvars_timeseries", "down_sampling_factor", "global_timeseries", "regressor_timeseries", "sample_time", "timeseries_masker", "down_sampled_regression_confounds_df", "reference_regressor_timeshift", "filter_timeshifts_filter_type", "filter_timeshifts_size", "filter_timeshifts_smooth_fwhm", "confound_regressor_correlation_threshold")]),
+        (ValueNode(None).output.value, regression_wf.input[("timeseries_masker", "filter_timeshifts_filter_type", "filter_timeshifts_size", "filter_timeshifts_smooth_fwhm", "confound_regressor_correlation_threshold")]),
+        (post_processing_wf.output.depvars_postproc_timeseries, regression_wf.input.depvars_timeseries),
+        (post_processing_wf.output.global_postproc_timeseries, regression_wf.input.global_timeseries),
         (post_processing_wf.output.up_sampling_factor, regression_wf.input.down_sampling_factor),
         (post_processing_wf.output.up_sampled_sample_time, regression_wf.input.sample_time),
-        (post_processing_wf.output.regressor_postproc_unit, save_data_node.input.regressor_unit),
-        (post_processing_wf.output.depvars_postproc_unit, save_data_node.input.physio_unit),
-        (post_processing_wf.output.depvars_postproc_baseline, save_data_node.input.physio_baseline),
-        (post_processing_wf.output.regressor_postproc_baseline, save_data_node.input.regressor_baseline),
-        (post_processing_wf.output.global_postproc_baseline, save_data_node.input.global_baseline),
+        (get_regression_confounds_wf.output.down_sampled_regression_confounds_df, regression_wf.input.down_sampled_regression_confounds_df),
+        (refine_regressor_wf.output.refined_regressor_timeseries, regression_wf.input.regressor_timeseries),
+        (refine_regressor_wf.output.reference_regressor_timeshift, regression_wf.input.reference_regressor_timeshift),
         # save data
         (ProcessWorkflow.input._, save_data_node.input[('analysis_file', 'analysis_dict', 'subject', 'session', 'task', 'run', 'data_to_save')]),
         # post-processing data
@@ -50,14 +61,17 @@ cvr_analysis_wf = ProcessWorkflow(
         (post_processing_wf.output.initial_global_regressor_alignment, save_data_node.input.initial_global_regressor_alignment),
         (post_processing_wf.output.regressor_postproc_timeseries, save_data_node.input.initial_global_aligned_regressor_timeseries),
         (post_processing_wf.output.global_postproc_timeseries, save_data_node.input.global_postproc_timeseries),
+        (post_processing_wf.output.regressor_postproc_unit, save_data_node.input.regressor_unit),
+        (post_processing_wf.output.depvars_postproc_unit, save_data_node.input.physio_unit),
+        (post_processing_wf.output.depvars_postproc_baseline, save_data_node.input.physio_baseline),
+        (post_processing_wf.output.regressor_postproc_baseline, save_data_node.input.regressor_baseline),
+        (post_processing_wf.output.global_postproc_baseline, save_data_node.input.global_baseline),
+        (post_processing_wf.output.up_sampled_sample_time / post_processing_wf.output.up_sampling_factor, save_data_node.input.regression_sample_time),
+        # get confounds
+        (get_regression_confounds_wf.output.down_sampled_regression_confounds_df, save_data_node.input.regression_confounds_df),
+        # refine regressor
+        (regression_wf.output.reference_regressor_timeshift, save_data_node.input.reference_regressor_timeshift),
         # regression data
-        (regression_wf.output.down_sampled_regression_confounds_postproc_df, save_data_node.input.regression_confounds_df),
-        (regression_wf.output.regressor_postproc_rms, save_data_node.input.regressor_rms),
-        (regression_wf.output.regressor_postproc_autocorrelation_timeshifts, save_data_node.input.regressor_autocorrelation_timeshifts),
-        (regression_wf.output.regressor_postproc_autocorrelation_correlations, save_data_node.input.regressor_autocorrelation_correlations),
-        (regression_wf.output.global_postproc_rms, save_data_node.input.global_rms),
-        (regression_wf.output.global_postproc_autocorrelation_timeshifts, save_data_node.input.global_autocorrelation_timeshifts),
-        (regression_wf.output.global_postproc_autocorrelation_correlations, save_data_node.input.global_autocorrelation_correlations),
         (regression_wf.output.global_regressor_timeshift_maxcorr, save_data_node.input.global_regressor_timeshift_maxcorr),
         (regression_wf.output.global_regressor_maxcorr, save_data_node.input.global_regressor_maxcorr),
         (regression_wf.output.global_regressor_timeshifts, save_data_node.input.global_regressor_timeshifts),
@@ -69,26 +83,24 @@ cvr_analysis_wf = ProcessWorkflow(
         (regression_wf.output.global_regressor_dof, save_data_node.input.global_regressor_dof),
         (regression_wf.output.global_regressor_r_squared, save_data_node.input.global_regressor_r_squared),
         (regression_wf.output.global_regressor_adjusted_r_squared, save_data_node.input.global_regressor_adjusted_r_squared),
-        (regression_wf.output.reference_regressor_timeshift, save_data_node.input.reference_regressor_timeshift),
         (regression_wf.output.align_regressor_absolute_lower_bound, save_data_node.input.align_regressor_absolute_lower_bound),
         (regression_wf.output.align_regressor_absolute_upper_bound, save_data_node.input.align_regressor_absolute_upper_bound),
-        (regression_wf.output.depvarsIter_down_sampled_depvars_postproc_timeseries, save_data_node.input.physio_postproc_timeseries),
+        (regression_wf.output.depvarsIter_down_sampled_depvars_timeseries, save_data_node.input.physio_postproc_timeseries),
         (regression_wf.output.depvarsIter_timeshift_maxcorr, save_data_node.input.physio_timeshift_maxcorr),
         (regression_wf.output.depvarsIter_maxcorr, save_data_node.input.physio_maxcorr),
         (regression_wf.output.depvarsIter_timeshifts, save_data_node.input.physio_timeshifts),
         (regression_wf.output.depvarsIter_correlations, save_data_node.input.physio_correlations),
-        (regression_wf.output.depvarsIter_down_sampled_aligned_regressor_postproc_timeseries, save_data_node.input.physio_aligned_regressor_timeseries),
+        (regression_wf.output.depvarsIter_down_sampled_aligned_regressor_timeseries, save_data_node.input.physio_aligned_regressor_timeseries),
         (regression_wf.output.depvarsIter_dof, save_data_node.input.physio_dof),
         (regression_wf.output.depvarsIter_regressor_p, save_data_node.input.physio_p_value),
-        (regression_wf.output.depvarsIter_down_sampled_depvars_postproc_predictions, save_data_node.input.physio_predictions),
+        (regression_wf.output.depvarsIter_down_sampled_depvars_predictions, save_data_node.input.physio_predictions),
         (regression_wf.output.depvarsIter_r_squared, save_data_node.input.physio_r_squared),
         (regression_wf.output.depvarsIter_adjusted_r_squared, save_data_node.input.physio_adjusted_r_squared),
         (regression_wf.output.depvarsIter_regressor_se, save_data_node.input.physio_standard_error),
         (regression_wf.output.depvarsIter_regressor_t, save_data_node.input.physio_t_value),
         (regression_wf.output.depvarsIter_regressor_beta, save_data_node.input.physio_cvr_amplitude),
-        (regression_wf.output.down_sampled_sample_time, save_data_node.input.regression_sample_time),
-        (regression_wf.output.down_sampled_global_postproc_timeseries, save_data_node.input.down_sampled_global_postproc_timeseries),
-        (regression_wf.output.down_sampled_global_aligned_regressor_postproc_timeseries, save_data_node.input.down_sampled_global_aligned_regressor_timeseries),
+        (regression_wf.output.down_sampled_global_timeseries, save_data_node.input.down_sampled_global_postproc_timeseries),
+        (regression_wf.output.down_sampled_global_aligned_regressor_timeseries, save_data_node.input.down_sampled_global_aligned_regressor_timeseries),
         (regression_wf.output.down_sampled_global_regressor_predictions, save_data_node.input.down_sampled_global_regressor_predictions),
         # map save data output
         (save_data_node.output.output, ProcessWorkflow.output.cvr_analysis_dummy_output),
