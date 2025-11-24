@@ -8,13 +8,35 @@ from nilearn import maskers
 import json
 
 from process_control import ConditionalNode, CustomNode
-from cvr_analysis import __version__
+from cvr_analysis.legacy.modalities_study import __version__
 from pathlib import Path
 
+from collections.abc import Mapping, Sequence
 # %%
 ##############################################
 # create hash
 ##############################################
+def _normalize_numbers(x):
+    # Normalize floats
+    if isinstance(x, float):
+        # Treat -0.0 and 0.0 as the same
+        if x == 0.0:
+            return 0.0
+        return x
+    # Recurse into dicts
+    if isinstance(x, Mapping):
+        return {k: _normalize_numbers(v) for k, v in x.items()}
+    # Recurse into lists/tuples
+    if isinstance(x, Sequence) and not isinstance(x, (str, bytes, bytearray)):
+        t = type(x)
+        return t(_normalize_numbers(v) for v in x)
+    return x
+
+def _stable_dict_hash(d: dict) -> str:
+    normalized = _normalize_numbers(d)
+    s = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(s.encode("utf-8")).hexdigest()
+
 def createHashCheckOverride(
                         output_directory, subject, session, task, run, space,
                                 voxel_mask, roi_masker, spatial_smoothing_fwhm, 
@@ -102,6 +124,7 @@ def createHashCheckOverride(
     }
 
     # analysis id
+    # analysis_id = _stable_dict_hash(analysis_info)[:15]
     analysis_id = hashlib.sha1(str(tuple(analysis_info.items())).encode("UTF-8")).hexdigest()[:15]
     # create preamble
     def getBStr(var, val):
@@ -141,7 +164,7 @@ def saveData(
                                                         bold_aligned_regressor_timeseries,
                                                             # bold regression data
                                                             bold_dof, bold_predictions, bold_r_squared, bold_adjusted_r_squared, bold_tsnr, 
-                                                                bold_cvr_amplitude, bold_p_value, regression_down_sampled_sample_time,
+                                                                bold_cvr_amplitude, bold_p_value, bold_t_value, regression_down_sampled_sample_time,
                                                                     # full output
                                                                     full_output = False) -> tuple:
         
@@ -159,6 +182,7 @@ def saveData(
         # 3D data
         timeseries_masker.inverse_transform(bold_cvr_amplitude).to_filename(preamble + "desc-cvrAmplitude_map.nii.gz")
         timeseries_masker.inverse_transform(bold_p_value).to_filename(preamble + "desc-pValue_map.nii.gz")
+        timeseries_masker.inverse_transform(bold_t_value).to_filename(preamble + "desc-tValue_map.nii.gz")
         timeseries_masker.inverse_transform(bold_timeshift_maxcorr).to_filename(preamble + "desc-cvrTimeshift_map.nii.gz")
         timeseries_masker.inverse_transform(bold_tsnr).to_filename(preamble + "desc-tsnr_map.nii.gz")
         timeseries_masker.inverse_transform(bold_r_squared).to_filename(preamble + "desc-rSquared_map.nii.gz")

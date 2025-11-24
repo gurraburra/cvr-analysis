@@ -370,7 +370,7 @@ class FilterTimeshifts(ProcessNode):
         # convert back to array
         filtered_timesshift_data = timeseries_masker.transform(
             image.new_img_like(new_timeshift_maxcorr_img, filtered_timeshift_3d_data)
-        )[0]
+        )
         # change back smoothing 
         timeseries_masker.smoothing_fwhm = old_smooth_fwhm
         # get values to mask

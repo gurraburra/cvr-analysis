@@ -10,6 +10,7 @@ from process_control import ConditionalNode, CustomNode
 from cvr_analysis import __version__
 from pathlib import Path
 
+from cvr_analysis.default.helpers.functions.generic import stable_dict_hash
 # %%
 ##############################################
 # create hash
@@ -116,7 +117,7 @@ def createHashCheckOverride(
     }
 
     # analysis id
-    analysis_id = hashlib.sha1(str(tuple(analysis_info.items())).encode("UTF-8")).hexdigest()[:15]
+    analysis_id = stable_dict_hash(analysis_info)[:15]
     # create preamble
     def getBStr(var, val):
         if val is not None:

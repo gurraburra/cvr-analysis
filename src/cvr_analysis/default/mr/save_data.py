@@ -13,6 +13,8 @@ from pathlib import Path
 
 from nilearn.regions import signal_extraction
 from nilearn.maskers import NiftiLabelsMasker
+
+from cvr_analysis.default.helpers.functions.generic import stable_dict_hash
 # %%
 ##############################################
 # create hash
@@ -140,7 +142,7 @@ def createHashCheckOverride(
     }
 
     # analysis id
-    analysis_id = hashlib.sha1(str(tuple(analysis_info.items())).encode("UTF-8")).hexdigest()[:15]
+    analysis_id = stable_dict_hash(analysis_info)[:15]
     # create preamble
     def getBStr(var, val):
         if val is not None:

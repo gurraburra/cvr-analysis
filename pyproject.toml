@@ -31,6 +31,7 @@ test = ["matplotlib", "seaborn", "jupyter", "ipywidgets", "ipympl", "wakepy", "o
 
 [project.scripts]
 cvr-analysis = "cvr_analysis.run:main"
+cvr-modality-study = "cvr_analysis.legacy.modalities_study.run:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "cvr_analysis._version.__version__"}
